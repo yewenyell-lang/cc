@@ -381,6 +381,15 @@ function Test-ApiConnection {
             Success = $false
             Message = $errorMsg
             Details = if ($responseBody) { $responseBody } else { $fullError }
+            Request = @{
+                Url = "$BaseUrl/v1/messages"
+                Headers = @{
+                    "x-api-key" = "****" + $Token.Substring([Math]::Max(0, $Token.Length - 4))
+                    "Content-Type" = "application/json"
+                    "anthropic-version" = "2023-06-01"
+                }
+                Body = $body
+            }
         }
     }
 }
@@ -443,9 +452,27 @@ function Test-Profile {
         Write-Host "  │$($ANSI.BrightRed)  ✗ 连接失败$($ANSI.Reset)                            │"
         Write-Host "  │    $($result.Message)" -ForegroundColor DarkGray
         Write-Host "  └────────────────────────────────────────┘" -ForegroundColor Red
+
+        # 显示请求信息
+        if ($result.Request) {
+            Write-Host ""
+            Write-Host "  请求信息:" -ForegroundColor Cyan
+            Write-Host "    URL: $($result.Request.Url)" -ForegroundColor DarkGray
+            Write-Host "    Headers:" -ForegroundColor DarkGray
+            foreach ($key in $result.Request.Headers.Keys) {
+                Write-Host "      ${key}: $($result.Request.Headers[$key])" -ForegroundColor DarkGray
+            }
+            Write-Host "    Body:" -ForegroundColor DarkGray
+            # 格式化 JSON 显示
+            $bodyLines = $result.Request.Body -split "`n"
+            foreach ($line in $bodyLines) {
+                Write-Host "      $line" -ForegroundColor DarkGray
+            }
+        }
+
         if ($result.Details) {
             Write-Host ""
-            Write-Host "  详细信息:" -ForegroundColor DarkGray
+            Write-Host "  响应信息:" -ForegroundColor Cyan
             Write-Host "  $($result.Details)" -ForegroundColor DarkGray
         }
     }
