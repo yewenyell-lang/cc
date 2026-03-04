@@ -52,16 +52,9 @@ $script:ANSI = @{
     BgWhite        = "`e[47m"
 }
 
-# 边框字符
+# 边框字符 - 左侧竖线样式
 $script:Border = @{
-    TL = '╔'  # 左上
-    TR = '╗'  # 右上
-    BL = '╚'  # 左下
-    BR = '╝'  # 右下
-    H  = '═'  # 横线
-    V  = '║'  # 竖线
-    LT = '╠'  # 左T
-    RT = '╣'  # 右T
+    Bar = '▌'  # 左侧粗竖线
 }
 
 # 读取单个按键
@@ -106,37 +99,21 @@ function Clear-Line {
     Write-Host $script:ANSI.ClearLine -NoNewline
 }
 
-# 绘制文本行（带左右边框）
-function Write-BorderedLine {
+# 绘制文本行（左侧竖线样式）
+function Write-LeftBarLine {
     param(
         [string]$Text,
-        [int]$Width,
-        [switch]$IsHeader,
-        [switch]$IsFooter
+        [switch]$NoBar
     )
 
     $b = $script:Border
     $a = $script:ANSI
 
-    if ($IsHeader) {
-        # 顶部边框
-        Write-Host "$($a.Cyan)$($b.TL)$($b.H * $Width)$($b.TR)$($a.Reset)"
-    } elseif ($IsFooter) {
-        # 底部边框
-        Write-Host "$($a.Cyan)$($b.BL)$($b.H * $Width)$($b.BR)$($a.Reset)"
+    if ($NoBar) {
+        Write-Host "  $Text"
     } else {
-        # 普通行
-        $content = $Text.PadRight($Width).Substring(0, [Math]::Min($Text.Length, $Width))
-        Write-Host "$($a.Cyan)$($b.V)$($a.Reset)$content$($a.Cyan)$($b.V)$($a.Reset)"
+        Write-Host "$($a.Cyan)$($b.Bar)$($a.Reset) $Text"
     }
-}
-
-# 绘制分隔线
-function Write-Separator {
-    param([int]$Width)
-    $b = $script:Border
-    $a = $script:ANSI
-    Write-Host "$($a.Cyan)$($b.LT)$($b.H * $Width)$($b.RT)$($a.Reset)"
 }
 
 <#
@@ -164,27 +141,20 @@ function Show-ProfileSelector {
 
     # 空列表处理
     if ($Profiles.Count -eq 0) {
-        $width = 50
         Clear-Screen
         Hide-Cursor
-        Write-BorderedLine "" $width -IsHeader
-        Write-BorderedLine "" $width
-        Write-BorderedLine "  暂无配置，使用 cc new 创建" $width
-        Write-BorderedLine "" $width
-        Write-BorderedLine "  按任意键退出" $width
-        Write-BorderedLine "" $width -IsFooter
+        Write-Host ""
+        Write-LeftBarLine "暂无配置，使用 cc new 创建"
+        Write-Host ""
+        Write-LeftBarLine "按任意键退出"
         $null = $Host.UI.RawUI.ReadKey('NoEcho,IncludeKeyDown')
         Show-Cursor
         return $null
     }
 
-    $width = 60
     $selectedIndex = 0
     $a = $script:ANSI
-
-    # 计算列表区域起始行
-    $headerLines = 4  # 标题 + 空行 + 上边框 + 列表头
-    $footerLines = 3  # 空行 + 帮助 + 下边框
+    $b = $script:Border
 
     # 隐藏光标
     Hide-Cursor
@@ -193,10 +163,9 @@ function Show-ProfileSelector {
     while ($true) {
         # 清屏并绘制界面
         Clear-Screen
-        Write-BorderedLine "" $width -IsHeader
-        Write-BorderedLine "  ✦ $Title" $width
-        Write-BorderedLine "" $width
-        Write-Separator $width
+        Write-Host ""
+        Write-LeftBarLine "$($a.Cyan)$Title$($a.Reset)"
+        Write-LeftBarLine ""
 
         # 绘制选项列表
         for ($i = 0; $i -lt $Profiles.Count; $i++) {
@@ -204,28 +173,21 @@ function Show-ProfileSelector {
             $isSelected = ($i -eq $selectedIndex)
 
             # 构建显示文本
-            $marker = if ($item.isCurrent) { "$($a.Green)●$($a.Reset)" } else { " " }
+            $marker = if ($item.isCurrent) { "$($a.Green)●$($a.Reset)" } else { "○" }
             $aliasText = $item.alias.PadRight(12)
             $nameText = $item.name
 
-            $lineText = "    $marker $aliasText $nameText"
-
-            # 高亮选中项
+            # 选中项添加箭头
             if ($isSelected) {
-                $lineText = "$($a.Reverse)$lineText$($a.Reset)"
+                $lineText = "  $marker $aliasText $nameText"
+                Write-LeftBarLine "$($a.Reverse)$lineText$($a.Reset)"
+            } else {
+                Write-LeftBarLine "  $marker $aliasText $nameText"
             }
-
-            Write-BorderedLine $lineText $width
         }
 
-        Write-BorderedLine "" $width
-        Write-BorderedLine "  ● 当前使用的配置" $width
-        Write-BorderedLine "" $width
-
-        # 帮助文字
-        $helpText = "  ↑↓ 选择 │ Enter 确认 │ Esc 取消"
-        Write-BorderedLine "$($a.BrightBlack)$helpText$($a.Reset)" $width
-        Write-BorderedLine "" $width -IsFooter
+        Write-LeftBarLine ""
+        Write-LeftBarLine "$($a.BrightBlack)● 当前  ○ 其他 │ ↑↓ 选择  Enter 确认  Esc 取消$($a.Reset)"
 
         # 读取按键
         $key = Read-Key
@@ -374,10 +336,11 @@ function Show-ConfigForm {
     while ($true) {
         Clear-Screen
 
+        $b = $script:Border
         $title = if ($IsEdit) { "编辑配置" } else { "新建配置" }
-        Write-BorderedLine "" $width -IsHeader
-        Write-BorderedLine "  ✦ $title" $width
-        Write-BorderedLine "" $width
+        Write-Host ""
+        Write-LeftBarLine "$($a.Cyan)$title$($a.Reset)"
+        Write-LeftBarLine ""
 
         # 绘制字段
         for ($i = 0; $i -lt $script:FormFields.Count; $i++) {
@@ -388,7 +351,7 @@ function Show-ConfigForm {
 
             # 模型配置分隔符
             if ($field.Key -eq 'model') {
-                Write-BorderedLine "  ── 模型配置 (留空使用默认值) ──" $width
+                Write-LeftBarLine "$($a.Dim)── 模型配置 (留空使用默认值) ──$($a.Reset)"
             }
 
             # 显示值（令牌可隐藏）
@@ -399,39 +362,36 @@ function Show-ConfigForm {
             }
 
             # 必填标记
-            $requiredMark = if ($field.Required) { " *必填" } else { "" }
+            $requiredMark = if ($field.Required) { " *" } else { "" }
 
             # 构建行文本
-            $label = $field.Label.PadRight(8)
+            $label = $field.Label
             $inputBox = "[$($displayValue.PadRight(22).Substring(0, [Math]::Min($displayValue.Length, 22)))]"
 
             # 令牌显隐按钮
             $maskToggle = if ($field.Masked) {
-                $maskState = if ($tokenVisible) { "● 显示" } else { "○ 隐藏" }
+                $maskState = if ($tokenVisible) { "●" } else { "○" }
                 "  $maskState"
             } else { "" }
 
-            $lineText = "  $label $inputBox$requiredMark$maskToggle"
-
-            # 高亮当前字段
+            # 选中项使用反色高亮
             if ($isCurrentField) {
-                $lineText = "$($a.Reverse)$lineText$($a.Reset)"
+                $lineText = "  $label $inputBox$requiredMark$maskToggle"
+                Write-LeftBarLine "$($a.Reverse)$lineText$($a.Reset)"
+            } else {
+                Write-LeftBarLine "  $label $inputBox$requiredMark$maskToggle"
             }
-
-            Write-BorderedLine $lineText $width
 
             # 显示错误
             if ($error) {
-                Write-BorderedLine "             └─ $($a.BrightRed)✗ $error$($a.Reset)" $width
+                Write-Host "        $($a.BrightRed)└─ ✗ $error$($a.Reset)"
             }
         }
 
-        Write-BorderedLine "" $width
+        Write-LeftBarLine ""
 
         # 帮助文字
-        $helpText = "  ↑↓切换 │ Tab下一项 │ Space显隐令牌 │ F5保存 │ Esc取消"
-        Write-BorderedLine "$($a.BrightBlack)$helpText$($a.Reset)" $width
-        Write-BorderedLine "" $width -IsFooter
+        Write-LeftBarLine "$($a.BrightBlack)↑↓ 切换 │ Tab 下一项 │ Space 显隐令牌 │ F5 保存 │ Esc 取消$($a.Reset)"
 
         # 读取按键
         $key = Read-Key
