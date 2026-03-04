@@ -173,20 +173,20 @@ function Show-ProfileSelector {
             $isSelected = ($i -eq $selectedIndex)
 
             # 构建显示文本
-            $marker = if ($item.isCurrent) { "$($a.Green)●$($a.Reset)" } else { "○" }
             $aliasText = $item.alias.PadRight(12)
             $nameText = $item.name
+            $currentMark = if ($item.isCurrent) { " $($a.Green)(当前)$($a.Reset)" } else { "" }
 
             # 选中项：箭头 + 颜色高亮
             if ($isSelected) {
-                Write-LeftBarLine "$($a.Cyan)▶$($a.Reset) $marker $aliasText $nameText"
+                Write-LeftBarLine "$($a.Cyan)▶$($a.Reset) $aliasText $nameText$currentMark"
             } else {
-                Write-LeftBarLine "  $marker $aliasText $nameText"
+                Write-LeftBarLine "  $aliasText $nameText$currentMark"
             }
         }
 
         Write-LeftBarLine ""
-        Write-LeftBarLine "$($a.BrightBlack)● 当前  ○ 其他 │ ↑↓ 选择  Enter 确认  Esc 取消$($a.Reset)"
+        Write-LeftBarLine "$($a.BrightBlack)↑↓ 选择  Enter 确认  Esc 取消$($a.Reset)"
 
         # 读取按键
         $key = Read-Key
@@ -201,6 +201,109 @@ function Show-ProfileSelector {
             ([ConsoleKey]::Enter) {
                 Show-Cursor
                 return $Profiles[$selectedIndex].alias
+            }
+            ([ConsoleKey]::Escape) {
+                Show-Cursor
+                return $null
+            }
+        }
+    }
+}
+
+<#
+.SYNOPSIS
+显示多选列表
+
+.PARAMETER Items
+选项列表，每项包含 alias, name, isCurrent, isSelected
+
+.PARAMETER Title
+对话框标题
+
+.OUTPUTS
+选中的项数组，或 $null（用户取消）
+#>
+function Show-MultiSelectSelector {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory=$true)]
+        [hashtable[]]$Items,
+
+        [Parameter(Mandatory=$false)]
+        [string]$Title = "选择项目"
+    )
+
+    # 空列表处理
+    if ($Items.Count -eq 0) {
+        Clear-Screen
+        Hide-Cursor
+        Write-Host ""
+        Write-LeftBarLine "暂无可选项目"
+        Write-Host ""
+        Write-LeftBarLine "按任意键退出"
+        $null = $Host.UI.RawUI.ReadKey('NoEcho,IncludeKeyDown')
+        Show-Cursor
+        return $null
+    }
+
+    # 初始化选中状态
+    foreach ($item in $Items) {
+        if (-not $item.ContainsKey('isSelected')) {
+            $item.isSelected = $false
+        }
+    }
+
+    $selectedIndex = 0
+    $a = $script:ANSI
+
+    Hide-Cursor
+
+    # 主循环
+    while ($true) {
+        Clear-Screen
+        Write-Host ""
+        Write-LeftBarLine "$($a.Cyan)$Title$($a.Reset)"
+        Write-LeftBarLine ""
+
+        # 绘制选项列表
+        for ($i = 0; $i -lt $Items.Count; $i++) {
+            $item = $Items[$i]
+            $isFocused = ($i -eq $selectedIndex)
+            $checkMark = if ($item.isSelected) { "$($a.Green)●$($a.Reset)" } else { "○" }
+            $currentMark = if ($item.isCurrent) { " $($a.Green)(当前)$($a.Reset)" } else { "" }
+
+            $aliasText = $item.alias.PadRight(12)
+            $nameText = $item.name
+
+            if ($isFocused) {
+                Write-LeftBarLine "$($a.Cyan)▶$($a.Reset) $checkMark $aliasText $nameText$currentMark"
+            } else {
+                Write-LeftBarLine "  $checkMark $aliasText $nameText$currentMark"
+            }
+        }
+
+        Write-LeftBarLine ""
+        Write-LeftBarLine "$($a.BrightBlack)↑↓ 移动  Space 选择  Enter 确认  Esc 取消$($a.Reset)"
+
+        $key = Read-Key
+
+        switch ($key.Key) {
+            ([ConsoleKey]::UpArrow) {
+                $selectedIndex = [Math]::Max(0, $selectedIndex - 1)
+            }
+            ([ConsoleKey]::DownArrow) {
+                $selectedIndex = [Math]::Min($Items.Count - 1, $selectedIndex + 1)
+            }
+            ([ConsoleKey]::Spacebar) {
+                $Items[$selectedIndex].isSelected = -not $Items[$selectedIndex].isSelected
+            }
+            ([ConsoleKey]::Enter) {
+                Show-Cursor
+                $selected = $Items | Where-Object { $_.isSelected }
+                if ($selected.Count -eq 0) {
+                    return @()
+                }
+                return @($selected)
             }
             ([ConsoleKey]::Escape) {
                 Show-Cursor
