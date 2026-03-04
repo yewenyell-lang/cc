@@ -177,10 +177,9 @@ function Show-ProfileSelector {
             $aliasText = $item.alias.PadRight(12)
             $nameText = $item.name
 
-            # 选中项添加箭头
+            # 选中项：箭头 + 颜色高亮
             if ($isSelected) {
-                $lineText = "  $marker $aliasText $nameText"
-                Write-LeftBarLine "$($a.Reverse)$lineText$($a.Reset)"
+                Write-LeftBarLine "$($a.Cyan)▶$($a.Reset) $marker $aliasText $nameText"
             } else {
                 Write-LeftBarLine "  $marker $aliasText $nameText"
             }
@@ -374,10 +373,9 @@ function Show-ConfigForm {
                 "  $maskState"
             } else { "" }
 
-            # 选中项使用反色高亮
+            # 选中项使用箭头 + 颜色高亮
             if ($isCurrentField) {
-                $lineText = "  $label $inputBox$requiredMark$maskToggle"
-                Write-LeftBarLine "$($a.Reverse)$lineText$($a.Reset)"
+                Write-LeftBarLine "$($a.Cyan)▶$($a.Reset) $label $inputBox$requiredMark$maskToggle"
             } else {
                 Write-LeftBarLine "  $label $inputBox$requiredMark$maskToggle"
             }
