@@ -68,7 +68,7 @@ $script:Border = @{
 function Read-Key {
     $key = $Host.UI.RawUI.ReadKey('NoEcho,IncludeKeyDown')
     return @{
-        Key       = $key.KeyCode
+        Key       = $key.Key          # [ConsoleKey] 枚举
         Character = $key.Character
         Control   = $key.ControlKeyState -band [ConsoleModifiers]::Control
         Alt       = $key.ControlKeyState -band [ConsoleModifiers]::Alt
