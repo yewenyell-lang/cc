@@ -352,17 +352,35 @@ function Test-ApiConnection {
     }
     catch {
         $statusCode = $_.Exception.Response.StatusCode.value__
+
+        # 获取完整错误信息
+        $fullError = $_.Exception.Message
+        if ($_.Exception.InnerException) {
+            $fullError += " -> $($_.Exception.InnerException.Message)"
+        }
+
+        # 尝试读取响应体
+        $responseBody = $null
+        if ($_.Exception.Response) {
+            try {
+                $reader = New-Object System.IO.StreamReader($_.Exception.Response.GetResponseStream())
+                $responseBody = $reader.ReadToEnd()
+                $reader.Close()
+            } catch {}
+        }
+
         $errorMsg = switch ($statusCode) {
             401 { "认证失败，请检查令牌" }
             403 { "访问被拒绝" }
             404 { "API 端点不存在" }
             500 { "服务器内部错误" }
-            default { "连接失败: $($_.Exception.Message)" }
+            default { "连接失败: $fullError" }
         }
 
         return @{
             Success = $false
             Message = $errorMsg
+            Details = if ($responseBody) { $responseBody } else { $fullError }
         }
     }
 }
@@ -425,6 +443,11 @@ function Test-Profile {
         Write-Host "  │$($ANSI.BrightRed)  ✗ 连接失败$($ANSI.Reset)                            │"
         Write-Host "  │    $($result.Message)" -ForegroundColor DarkGray
         Write-Host "  └────────────────────────────────────────┘" -ForegroundColor Red
+        if ($result.Details) {
+            Write-Host ""
+            Write-Host "  详细信息:" -ForegroundColor DarkGray
+            Write-Host "  $($result.Details)" -ForegroundColor DarkGray
+        }
     }
 
     Write-Host ""
