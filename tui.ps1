@@ -136,3 +136,113 @@ function Write-Separator {
     $a = $script:ANSI
     Write-Host "$($a.Cyan)$($b.LT)$($b.H * $Width)$($b.RT)$($a.Reset)"
 }
+
+<#
+.SYNOPSIS
+显示配置选择列表
+
+.PARAMETER Profiles
+配置列表，每项包含 alias, name, isCurrent
+
+.PARAMETER Title
+对话框标题
+
+.OUTPUTS
+选中的配置别名，或 $null（用户取消）
+#>
+function Show-ProfileSelector {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory=$true)]
+        [hashtable[]]$Profiles,
+
+        [Parameter(Mandatory=$false)]
+        [string]$Title = "选择配置"
+    )
+
+    # 空列表处理
+    if ($Profiles.Count -eq 0) {
+        $width = 50
+        Clear-Screen
+        Hide-Cursor
+        Write-BorderedLine "" $width -IsHeader
+        Write-BorderedLine "" $width
+        Write-BorderedLine "  暂无配置，使用 cc new 创建" $width
+        Write-BorderedLine "" $width
+        Write-BorderedLine "  按任意键退出" $width
+        Write-BorderedLine "" $width -IsFooter
+        $null = $Host.UI.RawUI.ReadKey('NoEcho,IncludeKeyDown')
+        Show-Cursor
+        return $null
+    }
+
+    $width = 60
+    $selectedIndex = 0
+    $a = $script:ANSI
+
+    # 计算列表区域起始行
+    $headerLines = 4  # 标题 + 空行 + 上边框 + 列表头
+    $footerLines = 3  # 空行 + 帮助 + 下边框
+
+    # 隐藏光标
+    Hide-Cursor
+
+    # 主循环
+    while ($true) {
+        # 清屏并绘制界面
+        Clear-Screen
+        Write-BorderedLine "" $width -IsHeader
+        Write-BorderedLine "  ✦ $Title" $width
+        Write-BorderedLine "" $width
+        Write-Separator $width
+
+        # 绘制选项列表
+        for ($i = 0; $i -lt $Profiles.Count; $i++) {
+            $item = $Profiles[$i]
+            $isSelected = ($i -eq $selectedIndex)
+
+            # 构建显示文本
+            $marker = if ($item.isCurrent) { "$($a.Green)●$($a.Reset)" } else { " " }
+            $aliasText = $item.alias.PadRight(12)
+            $nameText = $item.name
+
+            $lineText = "    $marker $aliasText $nameText"
+
+            # 高亮选中项
+            if ($isSelected) {
+                $lineText = "$($a.Reverse)$lineText$($a.Reset)"
+            }
+
+            Write-BorderedLine $lineText $width
+        }
+
+        Write-BorderedLine "" $width
+        Write-BorderedLine "  ● 当前使用的配置" $width
+        Write-BorderedLine "" $width
+
+        # 帮助文字
+        $helpText = "  ↑↓ 选择 │ Enter 确认 │ Esc 取消"
+        Write-BorderedLine "$($a.BrightBlack)$helpText$($a.Reset)" $width
+        Write-BorderedLine "" $width -IsFooter
+
+        # 读取按键
+        $key = Read-Key
+
+        switch ($key.Key) {
+            'UpArrow' {
+                $selectedIndex = [Math]::Max(0, $selectedIndex - 1)
+            }
+            'DownArrow' {
+                $selectedIndex = [Math]::Min($Profiles.Count - 1, $selectedIndex + 1)
+            }
+            'Enter' {
+                Show-Cursor
+                return $Profiles[$selectedIndex].alias
+            }
+            'Escape' {
+                Show-Cursor
+                return $null
+            }
+        }
+    }
+}
