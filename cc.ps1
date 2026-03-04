@@ -122,6 +122,25 @@ function Show-List {
     Write-Host ""
 }
 
+# 创建新配置
+function New-Profile {
+    $currentAlias = Get-CurrentAlias
+    $profiles = Get-Profiles -CurrentAlias $currentAlias
+    $existingAliases = $profiles | ForEach-Object { $_.alias }
+
+    $result = Show-ConfigForm -ExistingAliases $existingAliases
+
+    if ($result) {
+        # 保存配置文件
+        $profilePath = "$script:PROFILES_DIR/$($result.alias).json"
+        $result | ConvertTo-Json -Depth 10 | Set-Content $profilePath -Encoding UTF8
+
+        Write-Host ""
+        Write-Host "$($ANSI.Green)✓$($ANSI.Reset) 配置 '$($result.alias)' 创建成功" -ForegroundColor Green
+        Write-Host ""
+    }
+}
+
 # 主入口
 Ensure-ConfigDir
 
@@ -132,7 +151,7 @@ switch ($command) {
     $null { Show-Help }
     'use' { Write-Host "use 命令 - 待实现" }
     'list' { Show-List }
-    'new' { Write-Host "new 命令 - 待实现" }
+    'new' { New-Profile }
     'edit' { Write-Host "edit 命令 - 待实现" }
     'rm' { Write-Host "rm 命令 - 待实现" }
     'test' { Write-Host "test 命令 - 待实现" }
