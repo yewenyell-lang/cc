@@ -246,3 +246,282 @@ function Show-ProfileSelector {
         }
     }
 }
+
+# 表单字段定义
+$script:FormFields = @(
+    @{ Key = 'alias'; Label = '别名'; Required = $true }
+    @{ Key = 'name'; Label = '显示名称'; Required = $true }
+    @{ Key = 'baseUrl'; Label = 'API 地址'; Required = $true }
+    @{ Key = 'token'; Label = '认证令牌'; Required = $true; Masked = $true }
+    @{ Key = 'model'; Label = '默认模型'; Required = $true }
+    @{ Key = 'sonnetModel'; Label = 'Sonnet'; Required = $false }
+    @{ Key = 'opusModel'; Label = 'Opus'; Required = $false }
+    @{ Key = 'haikuModel'; Label = 'Haiku'; Required = $false }
+    @{ Key = 'reasoningModel'; Label = '推理模型'; Required = $false }
+)
+
+# 字段验证函数
+function Test-FormField {
+    param(
+        [string]$Key,
+        [string]$Value,
+        [string[]]$ExistingAliases,
+        [switch]$IsEdit
+    )
+
+    switch ($Key) {
+        'alias' {
+            if ([string]::IsNullOrWhiteSpace($Value)) {
+                return "别名不能为空"
+            }
+            if ($Value -notmatch '^[a-z0-9-]+$') {
+                return "别名只能包含小写字母、数字和连字符"
+            }
+            if (-not $IsEdit -and $Value -in $ExistingAliases) {
+                return "别名已存在"
+            }
+        }
+        'name' {
+            if ([string]::IsNullOrWhiteSpace($Value)) {
+                return "显示名称不能为空"
+            }
+        }
+        'baseUrl' {
+            if ([string]::IsNullOrWhiteSpace($Value)) {
+                return "API 地址不能为空"
+            }
+            if ($Value -notmatch '^https?://') {
+                return "API 地址必须以 http:// 或 https:// 开头"
+            }
+        }
+        'token' {
+            if ([string]::IsNullOrWhiteSpace($Value)) {
+                return "认证令牌不能为空"
+            }
+        }
+        'model' {
+            if ([string]::IsNullOrWhiteSpace($Value)) {
+                return "默认模型不能为空"
+            }
+        }
+    }
+    return $null
+}
+
+<#
+.SYNOPSIS
+显示配置表单
+
+.PARAMETER ExistingConfig
+现有配置（编辑模式）
+
+.PARAMETER IsEdit
+是否为编辑模式
+
+.PARAMETER ExistingAliases
+现有别名列表（用于唯一性验证）
+
+.OUTPUTS
+配置对象 @{alias; name; env: @{...}}，或 $null（用户取消）
+#>
+function Show-ConfigForm {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory=$false)]
+        [hashtable]$ExistingConfig,
+
+        [Parameter(Mandatory=$false)]
+        [switch]$IsEdit,
+
+        [Parameter(Mandatory=$false)]
+        [string[]]$ExistingAliases
+    )
+
+    $width = 60
+    $a = $script:ANSI
+
+    # 初始化字段值
+    $values = @{}
+    $errors = @{}
+
+    foreach ($field in $script:FormFields) {
+        $key = $field.Key
+        if ($ExistingConfig) {
+            switch ($key) {
+                'alias' { $values[$key] = $ExistingConfig.alias }
+                'name' { $values[$key] = $ExistingConfig.name }
+                'baseUrl' { $values[$key] = $ExistingConfig.env.ANTHROPIC_BASE_URL }
+                'token' { $values[$key] = $ExistingConfig.env.ANTHROPIC_AUTH_TOKEN }
+                'model' { $values[$key] = $ExistingConfig.env.ANTHROPIC_MODEL }
+                'sonnetModel' { $values[$key] = $ExistingConfig.env.ANTHROPIC_DEFAULT_SONNET_MODEL }
+                'opusModel' { $values[$key] = $ExistingConfig.env.ANTHROPIC_DEFAULT_OPUS_MODEL }
+                'haikuModel' { $values[$key] = $ExistingConfig.env.ANTHROPIC_DEFAULT_HAIKU_MODEL }
+                'reasoningModel' { $values[$key] = $ExistingConfig.env.ANTHROPIC_REASONING_MODEL }
+            }
+        } else {
+            $values[$key] = ''
+        }
+    }
+
+    $fieldIndex = 0
+    $tokenVisible = $false
+
+    Hide-Cursor
+
+    # 主循环
+    while ($true) {
+        Clear-Screen
+
+        $title = if ($IsEdit) { "编辑配置" } else { "新建配置" }
+        Write-BorderedLine "" $width -IsHeader
+        Write-BorderedLine "  ✦ $title" $width
+        Write-BorderedLine "" $width
+
+        # 绘制字段
+        for ($i = 0; $i -lt $script:FormFields.Count; $i++) {
+            $field = $script:FormFields[$i]
+            $isCurrentField = ($i -eq $fieldIndex)
+            $value = $values[$field.Key]
+            $error = $errors[$field.Key]
+
+            # 模型配置分隔符
+            if ($field.Key -eq 'model') {
+                Write-BorderedLine "  ── 模型配置 (留空使用默认值) ──" $width
+            }
+
+            # 显示值（令牌可隐藏）
+            $displayValue = if ($field.Masked -and -not $tokenVisible -and $value) {
+                '*' * [Math]::Min($value.Length, 20)
+            } else {
+                $value
+            }
+
+            # 必填标记
+            $requiredMark = if ($field.Required) { " *必填" } else { "" }
+
+            # 构建行文本
+            $label = $field.Label.PadRight(8)
+            $inputBox = "[$($displayValue.PadRight(22).Substring(0, [Math]::Min($displayValue.Length, 22)))]"
+
+            # 令牌显隐按钮
+            $maskToggle = if ($field.Masked) {
+                $maskState = if ($tokenVisible) { "● 显示" } else { "○ 隐藏" }
+                "  $maskState"
+            } else { "" }
+
+            $lineText = "  $label $inputBox$requiredMark$maskToggle"
+
+            # 高亮当前字段
+            if ($isCurrentField) {
+                $lineText = "$($a.Reverse)$lineText$($a.Reset)"
+            }
+
+            Write-BorderedLine $lineText $width
+
+            # 显示错误
+            if ($error) {
+                Write-BorderedLine "             └─ $($a.BrightRed)✗ $error$($a.Reset)" $width
+            }
+        }
+
+        Write-BorderedLine "" $width
+
+        # 帮助文字
+        $helpText = "  ↑↓切换 │ Tab下一项 │ Space显隐令牌 │ Ctrl+S保存 │ Esc取消"
+        Write-BorderedLine "$($a.BrightBlack)$helpText$($a.Reset)" $width
+        Write-BorderedLine "" $width -IsFooter
+
+        # 读取按键
+        $key = Read-Key
+        $currentField = $script:FormFields[$fieldIndex]
+
+        switch ($key.Key) {
+            'UpArrow' {
+                $fieldIndex = [Math]::Max(0, $fieldIndex - 1)
+            }
+            'DownArrow' {
+                $fieldIndex = [Math]::Min($script:FormFields.Count - 1, $fieldIndex + 1)
+            }
+            'Tab' {
+                $fieldIndex = ($fieldIndex + 1) % $script:FormFields.Count
+            }
+            'Enter' {
+                # 如果是令牌字段，切换显隐
+                if ($currentField.Masked) {
+                    $tokenVisible = -not $tokenVisible
+                }
+            }
+            'Spacebar' {
+                if ($currentField.Masked) {
+                    $tokenVisible = -not $tokenVisible
+                }
+            }
+            'Backspace' {
+                # 编辑模式且当前是别名字段，不允许修改
+                if ($IsEdit -and $currentField.Key -eq 'alias') {
+                    continue
+                }
+                $current = $values[$currentField.Key]
+                if ($current.Length -gt 0) {
+                    $values[$currentField.Key] = $current.Substring(0, $current.Length - 1)
+                }
+                $errors[$currentField.Key] = $null
+            }
+            'Escape' {
+                Show-Cursor
+                return $null
+            }
+            default {
+                # Ctrl+S 保存
+                if (Test-CtrlKey $key 's') {
+                    # 验证所有必填字段
+                    $hasErrors = $false
+                    $errors = @{}
+
+                    foreach ($field in $script:FormFields) {
+                        if ($field.Required -or $values[$field.Key]) {
+                            $error = Test-FormField -Key $field.Key -Value $values[$field.Key] `
+                                -ExistingAliases $ExistingAliases -IsEdit:$IsEdit
+                            if ($error) {
+                                $errors[$field.Key] = $error
+                                $hasErrors = $true
+                            }
+                        }
+                    }
+
+                    if (-not $hasErrors) {
+                        Show-Cursor
+
+                        # 构建返回对象
+                        $model = $values['model']
+                        return @{
+                            alias = $values['alias']
+                            name = $values['name']
+                            env = @{
+                                ANTHROPIC_AUTH_TOKEN = $values['token']
+                                ANTHROPIC_BASE_URL = $values['baseUrl']
+                                ANTHROPIC_MODEL = $model
+                                ANTHROPIC_DEFAULT_SONNET_MODEL = if ($values['sonnetModel']) { $values['sonnetModel'] } else { $model }
+                                ANTHROPIC_DEFAULT_OPUS_MODEL = if ($values['opusModel']) { $values['opusModel'] } else { $model }
+                                ANTHROPIC_DEFAULT_HAIKU_MODEL = if ($values['haikuModel']) { $values['haikuModel'] } else { $model }
+                                ANTHROPIC_REASONING_MODEL = if ($values['reasoningModel']) { $values['reasoningModel'] } else { $model }
+                            }
+                            skipDangerousModePermissionPrompt = $true
+                        }
+                    }
+                }
+                # 字符输入
+                elseif ($key.Character -and [char]::IsControl($key.Character) -eq $false) {
+                    # 编辑模式且当前是别名字段，不允许修改
+                    if ($IsEdit -and $currentField.Key -eq 'alias') {
+                        continue
+                    }
+
+                    $values[$currentField.Key] += $key.Character
+                    # 清除该字段错误
+                    $errors[$currentField.Key] = $null
+                }
+            }
+        }
+    }
+}
