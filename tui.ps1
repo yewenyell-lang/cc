@@ -429,7 +429,7 @@ function Show-ConfigForm {
         Write-BorderedLine "" $width
 
         # 帮助文字
-        $helpText = "  ↑↓切换 │ Tab下一项 │ Space显隐令牌 │ Ctrl+S保存 │ Esc取消"
+        $helpText = "  ↑↓切换 │ Tab下一项 │ Space显隐令牌 │ F5保存 │ Esc取消"
         Write-BorderedLine "$($a.BrightBlack)$helpText$($a.Reset)" $width
         Write-BorderedLine "" $width -IsFooter
 
@@ -469,27 +469,64 @@ function Show-ConfigForm {
                 }
                 $errors[$currentField.Key] = $null
             }
+            ([ConsoleKey]::F5) {
+                # F5 保存
+                # 验证所有必填字段
+                $hasErrors = $false
+                $errors = @{}
+
+                foreach ($field in $script:FormFields) {
+                    if ($field.Required -or $values[$field.Key]) {
+                        $error = Test-FormField -Key $field.Key -Value $values[$field.Key] `
+                            -ExistingAliases $ExistingAliases -IsEdit:$IsEdit
+                        if ($error) {
+                            $errors[$field.Key] = $error
+                            $hasErrors = $true
+                        }
+                    }
+                }
+
+                if (-not $hasErrors) {
+                    Show-Cursor
+
+                    # 构建返回对象
+                    $model = $values['model']
+                    return @{
+                        alias = $values['alias']
+                        name = $values['name']
+                        env = @{
+                            ANTHROPIC_AUTH_TOKEN = $values['token']
+                            ANTHROPIC_BASE_URL = $values['baseUrl']
+                            ANTHROPIC_MODEL = $model
+                            ANTHROPIC_DEFAULT_SONNET_MODEL = if ($values['sonnetModel']) { $values['sonnetModel'] } else { $model }
+                            ANTHROPIC_DEFAULT_OPUS_MODEL = if ($values['opusModel']) { $values['opusModel'] } else { $model }
+                            ANTHROPIC_DEFAULT_HAIKU_MODEL = if ($values['haikuModel']) { $values['haikuModel'] } else { $model }
+                            ANTHROPIC_REASONING_MODEL = if ($values['reasoningModel']) { $values['reasoningModel'] } else { $model }
+                        }
+                        skipDangerousModePermissionPrompt = $true
+                    }
+                }
+            }
             ([ConsoleKey]::Escape) {
                 Show-Cursor
                 return $null
             }
             default {
-                # Ctrl+S 保存
-                if (Test-CtrlKey $key 's') {
-                    # 验证所有必填字段
-                    $hasErrors = $false
-                    $errors = @{}
-
-                    foreach ($field in $script:FormFields) {
-                        if ($field.Required -or $values[$field.Key]) {
-                            $error = Test-FormField -Key $field.Key -Value $values[$field.Key] `
-                                -ExistingAliases $ExistingAliases -IsEdit:$IsEdit
-                            if ($error) {
-                                $errors[$field.Key] = $error
-                                $hasErrors = $true
-                            }
-                        }
+                # 字符输入
+                if ($key.Character -and [char]::IsControl($key.Character) -eq $false) {
+                    # 编辑模式且当前是别名字段，不允许修改
+                    if ($IsEdit -and $currentField.Key -eq 'alias') {
+                        continue
                     }
+
+                    $values[$currentField.Key] += $key.Character
+                    # 清除该字段错误
+                    $errors[$currentField.Key] = $null
+                }
+            }
+        }
+    }
+}
 
                     if (-not $hasErrors) {
                         Show-Cursor

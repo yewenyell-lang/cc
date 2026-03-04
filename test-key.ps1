@@ -1,33 +1,35 @@
-# 键盘输入诊断脚本
-# 用于测试 $Host.UI.RawUI.ReadKey() 的返回值
-
-Write-Host "键盘输入诊断工具" -ForegroundColor Cyan
-Write-Host "按任意键测试，按 Q 退出" -ForegroundColor Yellow
+# 键盘输入诊断脚本 - 完整测试
+Write-Host "键盘完整测试" -ForegroundColor Cyan
+Write-Host "测试: 1)单独按 S  2)按 Ctrl+S  3)按 Q 退出" -ForegroundColor Yellow
 Write-Host ""
+
+# ControlKeyState 标志
+$RightCtrlPressed = 4
+$LeftCtrlPressed = 8
 
 while ($true) {
     $key = $Host.UI.RawUI.ReadKey('NoEcho,IncludeKeyDown')
 
-    Write-Host "=== 按键信息 ===" -ForegroundColor Green
-    Write-Host "对象类型: $($key.GetType().FullName)"
-    Write-Host ""
-    Write-Host "所有属性:"
-    $key.PSObject.Properties | ForEach-Object {
-        Write-Host "  $($_.Name) = $($_.Value)"
-    }
-    Write-Host ""
+    # 检测 Ctrl 键（使用整数值）
+    $ctrlPressed = ($key.ControlKeyState -band $RightCtrlPressed) -or
+                   ($key.ControlKeyState -band $LeftCtrlPressed)
 
-    # 检查是否有 VirtualKeyCode
-    if ($key.VirtualKeyCode) {
-        Write-Host "VirtualKeyCode: $($key.VirtualKeyCode)"
+    # 尝试转换为 ConsoleKey
+    $consoleKey = $null
+    try {
         $consoleKey = [ConsoleKey]$key.VirtualKeyCode
-        Write-Host "转换为 ConsoleKey: $consoleKey"
+    } catch {
+        $consoleKey = "(无效: $($key.VirtualKeyCode))"
     }
 
-    Write-Host ""
-    Write-Host "--- 按任意键继续，Q 退出 ---" -ForegroundColor DarkGray
+    Write-Host "VK=$($key.VirtualKeyCode) Char='$($key.Character)'($([int]$key.Character)) Ctrl=$ctrlPressed Key=$consoleKey"
 
-    # 检测退出
+    # 检测 Ctrl+S
+    if ($ctrlPressed -and $consoleKey -eq [ConsoleKey]::S) {
+        Write-Host ">>> 检测到 Ctrl+S!" -ForegroundColor Green
+    }
+
+    # 检测 Q 退出
     if ($key.Character -eq 'Q' -or $key.Character -eq 'q') {
         return
     }
