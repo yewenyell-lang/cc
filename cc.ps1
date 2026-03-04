@@ -141,6 +141,64 @@ function New-Profile {
     }
 }
 
+# 切换配置并启动 Claude Code
+function Use-Profile {
+    param([string]$Alias)
+
+    $currentAlias = Get-CurrentAlias
+    $profiles = Get-Profiles -CurrentAlias $currentAlias
+
+    # 无参数时显示选择器
+    if (-not $Alias) {
+        if ($profiles.Count -eq 0) {
+            Write-Host ""
+            Write-Host "暂无配置，使用 cc new 创建" -ForegroundColor Yellow
+            Write-Host ""
+            return
+        }
+
+        $Alias = Show-ProfileSelector -Profiles $profiles -Title "选择配置"
+        if (-not $Alias) {
+            return
+        }
+    }
+
+    # 验证配置存在
+    $profilePath = "$script:PROFILES_DIR/$Alias.json"
+    if (-not (Test-Path $profilePath)) {
+        Write-Host ""
+        Write-Host "$($ANSI.BrightRed)✗$($ANSI.Reset) 配置 '$Alias' 不存在" -ForegroundColor Red
+        Write-Host ""
+        return
+    }
+
+    # 读取配置
+    $config = Get-Content $profilePath | ConvertFrom-Json
+
+    # 注入固定字段
+    $config.env | Add-Member -NotePropertyName "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS" -NotePropertyValue "1" -Force
+
+    # 生成临时配置文件
+    $tempPath = [System.IO.Path]::GetTempFileName() + ".json"
+    try {
+        $config | ConvertTo-Json -Depth 10 | Set-Content $tempPath -Encoding UTF8
+
+        # 更新当前配置
+        Set-CurrentAlias -Alias $Alias
+
+        # 启动 Claude Code
+        Write-Host ""
+        Write-Host "启动 Claude Code (配置: $Alias)..." -ForegroundColor Cyan
+        & claude --settings $tempPath
+    }
+    finally {
+        # 清理临时文件
+        if (Test-Path $tempPath) {
+            Remove-Item $tempPath -Force -ErrorAction SilentlyContinue
+        }
+    }
+}
+
 # 主入口
 Ensure-ConfigDir
 
@@ -149,7 +207,7 @@ $param = $args[1]
 
 switch ($command) {
     $null { Show-Help }
-    'use' { Write-Host "use 命令 - 待实现" }
+    'use' { Use-Profile -Alias $param }
     'list' { Show-List }
     'new' { New-Profile }
     'edit' { Write-Host "edit 命令 - 待实现" }
