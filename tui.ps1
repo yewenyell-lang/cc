@@ -67,8 +67,10 @@ $script:Border = @{
 # 读取单个按键
 function Read-Key {
     $key = $Host.UI.RawUI.ReadKey('NoEcho,IncludeKeyDown')
+    # KeyInfo 结构使用 VirtualKeyCode，需要转换为 ConsoleKey 枚举
+    $consoleKey = [ConsoleKey]$key.VirtualKeyCode
     return @{
-        Key       = $key.Key          # [ConsoleKey] 枚举
+        Key       = $consoleKey      # [ConsoleKey] 枚举
         Character = $key.Character
         Control   = $key.ControlKeyState -band [ConsoleModifiers]::Control
         Alt       = $key.ControlKeyState -band [ConsoleModifiers]::Alt
