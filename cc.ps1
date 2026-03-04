@@ -199,6 +199,237 @@ function Use-Profile {
     }
 }
 
+# 编辑配置
+function Edit-Profile {
+    param([string]$Alias)
+
+    $currentAlias = Get-CurrentAlias
+    $profiles = Get-Profiles -CurrentAlias $currentAlias
+
+    # 无参数时显示选择器
+    if (-not $Alias) {
+        if ($profiles.Count -eq 0) {
+            Write-Host ""
+            Write-Host "暂无配置，使用 cc new 创建" -ForegroundColor Yellow
+            Write-Host ""
+            return
+        }
+
+        $Alias = Show-ProfileSelector -Profiles $profiles -Title "选择要编辑的配置"
+        if (-not $Alias) {
+            return
+        }
+    }
+
+    # 验证配置存在
+    $profilePath = "$script:PROFILES_DIR/$Alias.json"
+    if (-not (Test-Path $profilePath)) {
+        Write-Host ""
+        Write-Host "$($ANSI.BrightRed)✗$($ANSI.Reset) 配置 '$Alias' 不存在" -ForegroundColor Red
+        Write-Host ""
+        return
+    }
+
+    # 读取现有配置
+    $existingConfig = Get-Content $profilePath | ConvertFrom-Json
+    $existingHashtable = @{
+        alias = $Alias
+        name = $existingConfig.name
+        env = @{
+            ANTHROPIC_AUTH_TOKEN = $existingConfig.env.ANTHROPIC_AUTH_TOKEN
+            ANTHROPIC_BASE_URL = $existingConfig.env.ANTHROPIC_BASE_URL
+            ANTHROPIC_MODEL = $existingConfig.env.ANTHROPIC_MODEL
+            ANTHROPIC_DEFAULT_SONNET_MODEL = $existingConfig.env.ANTHROPIC_DEFAULT_SONNET_MODEL
+            ANTHROPIC_DEFAULT_OPUS_MODEL = $existingConfig.env.ANTHROPIC_DEFAULT_OPUS_MODEL
+            ANTHROPIC_DEFAULT_HAIKU_MODEL = $existingConfig.env.ANTHROPIC_DEFAULT_HAIKU_MODEL
+            ANTHROPIC_REASONING_MODEL = $existingConfig.env.ANTHROPIC_REASONING_MODEL
+        }
+    }
+
+    $existingAliases = $profiles | ForEach-Object { $_.alias }
+    $result = Show-ConfigForm -ExistingConfig $existingHashtable -IsEdit -ExistingAliases $existingAliases
+
+    if ($result) {
+        # 保存配置（使用原别名）
+        $result.alias = $Alias
+        $result | ConvertTo-Json -Depth 10 | Set-Content $profilePath -Encoding UTF8
+
+        Write-Host ""
+        Write-Host "$($ANSI.Green)✓$($ANSI.Reset) 配置 '$Alias' 已更新" -ForegroundColor Green
+        Write-Host ""
+    }
+}
+
+# 删除配置
+function Remove-Profile {
+    param([string]$Alias)
+
+    $currentAlias = Get-CurrentAlias
+    $profiles = Get-Profiles -CurrentAlias $currentAlias
+
+    # 无参数时显示选择器
+    if (-not $Alias) {
+        if ($profiles.Count -eq 0) {
+            Write-Host ""
+            Write-Host "暂无配置" -ForegroundColor Yellow
+            Write-Host ""
+            return
+        }
+
+        $Alias = Show-ProfileSelector -Profiles $profiles -Title "选择要删除的配置"
+        if (-not $Alias) {
+            return
+        }
+    }
+
+    # 验证配置存在
+    $profilePath = "$script:PROFILES_DIR/$Alias.json"
+    if (-not (Test-Path $profilePath)) {
+        Write-Host ""
+        Write-Host "$($ANSI.BrightRed)✗$($ANSI.Reset) 配置 '$Alias' 不存在" -ForegroundColor Red
+        Write-Host ""
+        return
+    }
+
+    # 确认删除
+    Write-Host ""
+    Write-Host "确定要删除配置 '$Alias' 吗？ (y/N): " -NoNewline -ForegroundColor Yellow
+    $confirm = Read-Host
+
+    if ($confirm -eq 'y' -or $confirm -eq 'Y') {
+        Remove-Item $profilePath -Force
+
+        # 如果删除的是当前配置，清除 current 文件
+        if ($Alias -eq $currentAlias) {
+            Remove-Item $script:CURRENT_FILE -Force -ErrorAction SilentlyContinue
+        }
+
+        Write-Host ""
+        Write-Host "$($ANSI.Green)✓$($ANSI.Reset) 配置 '$Alias' 已删除" -ForegroundColor Green
+        Write-Host ""
+    } else {
+        Write-Host ""
+        Write-Host "已取消" -ForegroundColor DarkGray
+        Write-Host ""
+    }
+}
+
+# 测试 API 连接
+function Test-ApiConnection {
+    param([string]$BaseUrl, [string]$Token)
+
+    $startTime = Get-Date
+
+    try {
+        $headers = @{
+            "x-api-key" = $Token
+            "Content-Type" = "application/json"
+            "anthropic-version" = "2023-06-01"
+        }
+
+        $body = @{
+            model = "claude-3-haiku-20240307"
+            max_tokens = 10
+            messages = @(@{
+                role = "user"
+                content = "Hi"
+            })
+        } | ConvertTo-Json -Depth 3
+
+        $response = Invoke-RestMethod `
+            -Uri "$BaseUrl/v1/messages" `
+            -Method Post `
+            -Headers $headers `
+            -Body $body `
+            -TimeoutSec 10
+
+        $elapsed = ((Get-Date) - $startTime).TotalMilliseconds
+
+        return @{
+            Success = $true
+            Latency = [math]::Round($elapsed, 0)
+        }
+    }
+    catch {
+        $statusCode = $_.Exception.Response.StatusCode.value__
+        $errorMsg = switch ($statusCode) {
+            401 { "认证失败，请检查令牌" }
+            403 { "访问被拒绝" }
+            404 { "API 端点不存在" }
+            500 { "服务器内部错误" }
+            default { "连接失败: $($_.Exception.Message)" }
+        }
+
+        return @{
+            Success = $false
+            Message = $errorMsg
+        }
+    }
+}
+
+# 测试配置
+function Test-Profile {
+    param([string]$Alias)
+
+    $currentAlias = Get-CurrentAlias
+    $profiles = Get-Profiles -CurrentAlias $currentAlias
+
+    # 无参数时显示选择器
+    if (-not $Alias) {
+        if ($profiles.Count -eq 0) {
+            Write-Host ""
+            Write-Host "暂无配置，使用 cc new 创建" -ForegroundColor Yellow
+            Write-Host ""
+            return
+        }
+
+        $Alias = Show-ProfileSelector -Profiles $profiles -Title "选择要测试的配置"
+        if (-not $Alias) {
+            return
+        }
+    }
+
+    # 验证配置存在
+    $profilePath = "$script:PROFILES_DIR/$Alias.json"
+    if (-not (Test-Path $profilePath)) {
+        Write-Host ""
+        Write-Host "$($ANSI.BrightRed)✗$($ANSI.Reset) 配置 '$Alias' 不存在" -ForegroundColor Red
+        Write-Host ""
+        return
+    }
+
+    $config = Get-Content $profilePath | ConvertFrom-Json
+
+    Write-Host ""
+    Write-Host "测试配置: $Alias ($($config.name))"
+    Write-Host ""
+    Write-Host "  API 地址: $($config.env.ANTHROPIC_BASE_URL)"
+    Write-Host "  模型: $($config.env.ANTHROPIC_MODEL)"
+    Write-Host ""
+    Write-Host "  正在连接..." -NoNewline
+
+    $result = Test-ApiConnection `
+        -BaseUrl $config.env.ANTHROPIC_BASE_URL `
+        -Token $config.env.ANTHROPIC_AUTH_TOKEN
+
+    Write-Host "`r  " -NoNewline  # 清除 "正在连接..."
+    Write-Host ""
+
+    if ($result.Success) {
+        Write-Host "  ┌────────────────────────────────────────┐" -ForegroundColor Green
+        Write-Host "  │$($ANSI.Green)  ✓ 连接成功$($ANSI.Reset)                            │"
+        Write-Host "  │    响应时间: $($result.Latency)ms                      │" -ForegroundColor DarkGray
+        Write-Host "  └────────────────────────────────────────┘" -ForegroundColor Green
+    } else {
+        Write-Host "  ┌────────────────────────────────────────┐" -ForegroundColor Red
+        Write-Host "  │$($ANSI.BrightRed)  ✗ 连接失败$($ANSI.Reset)                            │"
+        Write-Host "  │    $($result.Message)" -ForegroundColor DarkGray
+        Write-Host "  └────────────────────────────────────────┘" -ForegroundColor Red
+    }
+
+    Write-Host ""
+}
+
 # 主入口
 Ensure-ConfigDir
 
@@ -210,8 +441,8 @@ switch ($command) {
     'use' { Use-Profile -Alias $param }
     'list' { Show-List }
     'new' { New-Profile }
-    'edit' { Write-Host "edit 命令 - 待实现" }
-    'rm' { Write-Host "rm 命令 - 待实现" }
-    'test' { Write-Host "test 命令 - 待实现" }
+    'edit' { Edit-Profile -Alias $param }
+    'rm' { Remove-Profile -Alias $param }
+    'test' { Test-Profile -Alias $param }
     default { Write-Host "未知命令: $command" -ForegroundColor Red; Show-Help }
 }
