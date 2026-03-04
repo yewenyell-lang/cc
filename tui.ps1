@@ -229,17 +229,17 @@ function Show-ProfileSelector {
         $key = Read-Key
 
         switch ($key.Key) {
-            'UpArrow' {
+            ([ConsoleKey]::UpArrow) {
                 $selectedIndex = [Math]::Max(0, $selectedIndex - 1)
             }
-            'DownArrow' {
+            ([ConsoleKey]::DownArrow) {
                 $selectedIndex = [Math]::Min($Profiles.Count - 1, $selectedIndex + 1)
             }
-            'Enter' {
+            ([ConsoleKey]::Enter) {
                 Show-Cursor
                 return $Profiles[$selectedIndex].alias
             }
-            'Escape' {
+            ([ConsoleKey]::Escape) {
                 Show-Cursor
                 return $null
             }
@@ -436,27 +436,27 @@ function Show-ConfigForm {
         $currentField = $script:FormFields[$fieldIndex]
 
         switch ($key.Key) {
-            'UpArrow' {
+            ([ConsoleKey]::UpArrow) {
                 $fieldIndex = [Math]::Max(0, $fieldIndex - 1)
             }
-            'DownArrow' {
+            ([ConsoleKey]::DownArrow) {
                 $fieldIndex = [Math]::Min($script:FormFields.Count - 1, $fieldIndex + 1)
             }
-            'Tab' {
+            ([ConsoleKey]::Tab) {
                 $fieldIndex = ($fieldIndex + 1) % $script:FormFields.Count
             }
-            'Enter' {
+            ([ConsoleKey]::Enter) {
                 # 如果是令牌字段，切换显隐
                 if ($currentField.Masked) {
                     $tokenVisible = -not $tokenVisible
                 }
             }
-            'Spacebar' {
+            ([ConsoleKey]::Spacebar) {
                 if ($currentField.Masked) {
                     $tokenVisible = -not $tokenVisible
                 }
             }
-            'Backspace' {
+            ([ConsoleKey]::Backspace) {
                 # 编辑模式且当前是别名字段，不允许修改
                 if ($IsEdit -and $currentField.Key -eq 'alias') {
                     continue
@@ -467,7 +467,7 @@ function Show-ConfigForm {
                 }
                 $errors[$currentField.Key] = $null
             }
-            'Escape' {
+            ([ConsoleKey]::Escape) {
                 Show-Cursor
                 return $null
             }
