@@ -89,6 +89,39 @@ function Show-Help {
     Write-Host ""
 }
 
+# 显示配置列表
+function Show-List {
+    $currentAlias = Get-CurrentAlias
+    $profiles = Get-Profiles -CurrentAlias $currentAlias
+
+    Write-Host ""
+    Write-Host "配置列表 ($($profiles.Count) 个)" -ForegroundColor Cyan
+    Write-Host ""
+
+    if ($profiles.Count -eq 0) {
+        Write-Host "  暂无配置，使用 cc new 创建" -ForegroundColor Yellow
+        return
+    }
+
+    # 表头
+    Write-Host "  别名          显示名称              模型"
+    Write-Host "  " -NoNewline
+    Write-Host ("─" * 50) -ForegroundColor DarkGray
+
+    foreach ($p in $profiles) {
+        $marker = if ($p.isCurrent) { "$($ANSI.Green)●$($ANSI.Reset)" } else { " " }
+        $alias = $p.alias.PadRight(12)
+        $name = $p.name.PadRight(16)
+        $model = $p.config.env.ANTHROPIC_MODEL
+
+        Write-Host "  $marker $alias $name $model"
+    }
+
+    Write-Host ""
+    Write-Host "  ● 当前使用的配置" -ForegroundColor DarkGray
+    Write-Host ""
+}
+
 # 主入口
 Ensure-ConfigDir
 
@@ -98,7 +131,7 @@ $param = $args[1]
 switch ($command) {
     $null { Show-Help }
     'use' { Write-Host "use 命令 - 待实现" }
-    'list' { Write-Host "list 命令 - 待实现" }
+    'list' { Show-List }
     'new' { Write-Host "new 命令 - 待实现" }
     'edit' { Write-Host "edit 命令 - 待实现" }
     'rm' { Write-Host "rm 命令 - 待实现" }
