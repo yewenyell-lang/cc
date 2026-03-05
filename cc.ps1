@@ -568,9 +568,10 @@ function Use-Profile {
         # 更新当前配置
         Set-CurrentAlias -Alias $Alias
 
-        # 启动 Claude Code
-        Write-Host ""
+        # 清空屏幕，只保留启动提示
+        Clear-Host
         Write-Host "启动 Claude Code (配置: $Alias)..." -ForegroundColor Cyan
+        Write-Host ""
         & claude --settings $tempPath --dangerously-skip-permissions
     }
     finally {
