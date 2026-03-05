@@ -615,3 +615,49 @@ function Show-ConfigForm {
         }
     }
 }
+
+# 显示模型输入表单
+function Show-ModelInputForm {
+    param(
+        [Parameter(Mandatory=$false)]
+        [string[]]$ExistingModels = @()
+    )
+
+    $a = $script:ANSI
+    $models = @() + $ExistingModels
+
+    while ($true) {
+        Clear-Screen
+        Write-Host ""
+        Write-LeftBarLine "$($a.Cyan)添加可选模型$($a.Reset)"
+        Write-LeftBarLine ""
+
+        # 显示已添加的模型
+        if ($models.Count -gt 0) {
+            Write-LeftBarLine "已添加的模型："
+            for ($i = 0; $i -lt $models.Count; $i++) {
+                Write-LeftBarLine "  $($i + 1). $($models[$i])"
+            }
+            Write-LeftBarLine ""
+        }
+
+        Write-LeftBarLine "输入模型 ID（回车添加，空行结束）："
+        Write-LeftBarLine ""
+
+        # 显示输入框
+        $inputBox = "[                              ]"
+        Write-LeftBarLine "  $inputBox"
+
+        Write-LeftBarLine ""
+        Write-LeftBarLine "$($a.BrightBlack)↑↓ 上下移动 │ 回车 添加 │ Delete 删除 │ Esc 完成$($a.Reset)"
+
+        # 读取输入
+        $input = Read-Host
+        if ([string]::IsNullOrWhiteSpace($input)) {
+            break
+        }
+        $models += $input.Trim()
+    }
+
+    return $models
+}
