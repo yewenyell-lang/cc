@@ -78,6 +78,43 @@ function Set-SyncConfig {
     $config | ConvertTo-Json -Depth 10 | Set-Content $script:CONFIG_FILE -Encoding UTF8
 }
 
+# 初始化同步配置（交互式）
+function Initialize-SyncConfig {
+    Write-Host ""
+    Write-Host "正在初始化同步配置..." -ForegroundColor Cyan
+    Write-Host ""
+
+    # 输入仓库 URL
+    Write-Host "请输入 Git 仓库 URL (SSH 格式): " -NoNewline
+    $repoUrl = Read-Host
+
+    if (-not $repoUrl) {
+        Write-Host ""
+        Write-Host "$($ANSI.BrightRed)✗$($ANSI.Reset) 仓库 URL 不能为空" -ForegroundColor Red
+        Write-Host ""
+        return $null
+    }
+
+    # 输入分支名称
+    Write-Host "分支名称 [main]: " -NoNewline
+    $branch = Read-Host
+    if (-not $branch) {
+        $branch = "main"
+    }
+
+    # 保存配置
+    Set-SyncConfig -RepoUrl $repoUrl -Branch $branch
+
+    Write-Host ""
+    Write-Host "$($ANSI.Green)✓$($ANSI.Reset) 配置已保存" -ForegroundColor Green
+    Write-Host ""
+
+    return @{
+        repoUrl = $repoUrl
+        branch = $branch
+    }
+}
+
 # 获取所有配置
 function Get-Profiles {
     param([string]$CurrentAlias)
