@@ -3,6 +3,7 @@
 
 param(
     [string]$LocalSourcePath = "",
+    [string]$Source = "github",
     [switch]$Version,
     [switch]$Help
 )
@@ -16,6 +17,12 @@ $SCRIPT_VERSION = "1.0.0"
 $REPO_OWNER = "yewenyell-lang"
 $REPO_NAME = "cc"
 $INSTALL_DIR = "$env:USERPROFILE\.cc"
+
+# 更新源 URL
+$UPDATE_SOURCES = @{
+    github = "https://raw.githubusercontent.com/$REPO_OWNER/$REPO_NAME/main"
+    gitee = "https://gitee.com/yell-run/cc/raw/main"
+}
 
 # 需要下载/复制的文件
 $FILES = @("cc.ps1", "tui.ps1", "ccswitch.ps1")
@@ -33,13 +40,15 @@ if ($Help) {
     Write-Host "用法: update.ps1 [选项]"
     Write-Host ""
     Write-Host "选项:"
-    Write-Host "  -LocalSourcePath <路径>  从本地路径更新文件而不是从 GitHub 下载"
+    Write-Host "  -LocalSourcePath <路径>  从本地路径更新文件而不是下载"
+    Write-Host "  -Source <github|gitee>   指定更新源（默认: github）"
     Write-Host "  -Version                 显示版本信息"
     Write-Host "  -Help                    显示此帮助信息"
     Write-Host ""
     Write-Host "示例:"
     Write-Host "  update.ps1                          # 从 GitHub 更新到最新版本"
-    Write-Host "  update.ps1 -LocalSourcePath .\cc   # 从本地目录更新"
+    Write-Host "  update.ps1 -Source gitee            # 从 Gitee 更新"
+    Write-Host "  update.ps1 -LocalSourcePath .\cc    # 从本地目录更新"
     exit 0
 }
 
@@ -88,7 +97,10 @@ try {
     }
     else {
         # 下载文件
-        $BASE_URL = "https://raw.githubusercontent.com/$REPO_OWNER/$REPO_NAME/main"
+        if (-not $UPDATE_SOURCES.ContainsKey($Source)) {
+            $Source = "github"
+        }
+        $BASE_URL = $UPDATE_SOURCES[$Source]
         foreach ($file in $FILES) {
             $url = "$BASE_URL/$file"
             $tempPath = Join-Path $tempDir $file

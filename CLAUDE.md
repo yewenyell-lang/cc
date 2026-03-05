@@ -91,6 +91,8 @@ cc update [github|gitee]  # 可选指定更新源
 - **全局配置**: `~/.cc/config.json` - 存储 `updateSource` 等全局设置
 - **删除记录**: `~/.cc/deleted.json` - 记录已删除的配置，防止 sync pull 恢复
 
+Profile JSON 主要字段：`alias`, `displayName`, `apiToken`, `apiBaseUrl`, `models`（可选数组）
+
 ### 同步功能
 
 `Sync-Profiles` 函数实现了配置的 Git 同步：
@@ -112,7 +114,7 @@ cc update [github|gitee]  # 可选指定更新源
 
 ```powershell
 # 语法检查
-pwsh -NoProfile -Command "Get-Content cc.ps1 | ForEach-Object { [scriptblock]::Create($_) }" 2>$null; if ($?) { "OK" }
+pwsh -NoProfile -Command '$e=$null; [void][Management.Automation.PSParser]::Tokenize((Get-Content "cc.ps1" -Raw), [ref]$e); if($e){$e}else{"OK"}'
 
 # 快速功能测试
 . ./cc.ps1  # 在当前 shell 中加载函数，然后手动调用

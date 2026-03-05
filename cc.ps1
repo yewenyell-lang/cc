@@ -1110,7 +1110,7 @@ function Update-Cc {
 
     try {
         Invoke-WebRequest -Uri $UPDATE_URL -OutFile "$env:TEMP\cc-update.ps1" -ErrorAction Stop
-        & "$env:TEMP\cc-update.ps1"
+        & "$env:TEMP\cc-update.ps1" -Source $useSource
         Remove-Item "$env:TEMP\cc-update.ps1" -Force -ErrorAction SilentlyContinue
     }
     catch {
