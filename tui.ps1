@@ -320,6 +320,7 @@ $script:FormFields = @(
     @{ Key = 'baseUrl'; Label = 'API 地址'; Required = $true }
     @{ Key = 'token'; Label = '认证令牌'; Required = $true; Masked = $true }
     @{ Key = 'model'; Label = '默认模型'; Required = $true }
+    @{ Key = 'models'; Label = '可选模型'; Required = $false; IsArray = $true }
     @{ Key = 'sonnetModel'; Label = 'Sonnet'; Required = $false }
     @{ Key = 'opusModel'; Label = 'Opus'; Required = $false }
     @{ Key = 'haikuModel'; Label = 'Haiku'; Required = $false }
