@@ -41,12 +41,21 @@ if ($Help) {
     Write-Host ""
     Write-Host "选项:"
     Write-Host "  -LocalSourcePath <路径>  从本地路径更新文件而不是下载"
-    Write-Host "  -Source <github|gitee>   指定更新源（默认: github）"
+    Write-Host "  -Source <github|gitee>   指定更新源（默认读取 config.json 或 github）"
     Write-Host "  -Version                 显示版本信息"
     Write-Host "  -Help                    显示此帮助信息"
     Write-Host ""
+    Write-Host "更新源说明:"
+    Write-Host "  github  - 从 GitHub 更新（国外网络推荐）"
+    Write-Host "  gitee   - 从 Gitee 更新（国内网络推荐）"
+    Write-Host ""
+    Write-Host "配置优先级:"
+    Write-Host "  1. 命令行 -Source 参数"
+    Write-Host "  2. ~/.cc/config.json 中的 updateSource"
+    Write-Host "  3. 默认使用 github"
+    Write-Host ""
     Write-Host "示例:"
-    Write-Host "  update.ps1                          # 从 GitHub 更新到最新版本"
+    Write-Host "  update.ps1                          # 使用配置或默认源更新"
     Write-Host "  update.ps1 -Source gitee            # 从 Gitee 更新"
     Write-Host "  update.ps1 -LocalSourcePath .\cc    # 从本地目录更新"
     exit 0
@@ -96,6 +105,19 @@ try {
         }
     }
     else {
+        # 尝试从全局配置读取更新源（向后兼容旧版 cc.ps1）
+        $configPath = "$env:USERPROFILE\.cc\config.json"
+        if (Test-Path $configPath) {
+            try {
+                $savedConfig = Get-Content $configPath -Raw | ConvertFrom-Json
+                if ($savedConfig.updateSource -and $UPDATE_SOURCES.ContainsKey($savedConfig.updateSource)) {
+                    $Source = $savedConfig.updateSource
+                }
+            } catch {
+                # 忽略配置读取错误
+            }
+        }
+
         # 下载文件
         if (-not $UPDATE_SOURCES.ContainsKey($Source)) {
             $Source = "github"

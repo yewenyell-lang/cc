@@ -538,7 +538,7 @@ function Show-Help {
     Write-Host "  cc test [alias] 测试 API 连接 (无参数显示选择器)"
     Write-Host "  cc ccswitch     从 cc-switch 迁移配置"
     Write-Host "  cc uninstall    卸载 cc"
-    Write-Host "  cc update       更新 cc 到最新版本"
+    Write-Host "  cc update [github|gitee] 更新 cc 到最新版本"
     Write-Host "  cc sync [push|pull] 同步配置到/从远程仓库"
     Write-Host ""
 }
