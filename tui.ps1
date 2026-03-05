@@ -424,9 +424,22 @@ function Show-ConfigForm {
                 'opusModel' { $values[$key] = $ExistingConfig.env.ANTHROPIC_DEFAULT_OPUS_MODEL }
                 'haikuModel' { $values[$key] = $ExistingConfig.env.ANTHROPIC_DEFAULT_HAIKU_MODEL }
                 'reasoningModel' { $values[$key] = $ExistingConfig.env.ANTHROPIC_REASONING_MODEL }
+                'models' {
+                    $models = @()
+                    if ($ExistingConfig.env.PSObject.Properties.Name -contains 'ANTHROPIC_MODELS') {
+                        $modelsJson = $ExistingConfig.env.ANTHROPIC_MODELS
+                        if ($modelsJson) {
+                            $models = $modelsJson | ConvertFrom-Json
+                            if ($models -is [String]) {
+                                $models = @($models)
+                            }
+                        }
+                    }
+                    $values[$key] = $models
+                }
             }
         } else {
-            $values[$key] = ''
+            $values[$key] = if ($field.IsArray) { @() } else { '' }
         }
     }
 
@@ -517,6 +530,11 @@ function Show-ConfigForm {
                 if ($currentField.Masked) {
                     $tokenVisible = -not $tokenVisible
                 }
+                # 如果是数组字段，弹出模型输入表单
+                if ($currentField.IsArray) {
+                    $models = Show-ModelInputForm -ExistingModels $values['models']
+                    $values['models'] = $models
+                }
             }
             ([ConsoleKey]::Spacebar) {
                 if ($currentField.Masked) {
@@ -556,6 +574,7 @@ function Show-ConfigForm {
 
                     # 构建返回对象
                     $model = $values['model']
+                    $models = $values['models']
                     return @{
                         alias = $values['alias']
                         name = $values['name']
@@ -567,6 +586,7 @@ function Show-ConfigForm {
                             ANTHROPIC_DEFAULT_OPUS_MODEL = if ($values['opusModel']) { $values['opusModel'] } else { $model }
                             ANTHROPIC_DEFAULT_HAIKU_MODEL = if ($values['haikuModel']) { $values['haikuModel'] } else { $model }
                             ANTHROPIC_REASONING_MODEL = if ($values['reasoningModel']) { $values['reasoningModel'] } else { $model }
+                            ANTHROPIC_MODELS = if ($models -and $models.Count -gt 0) { ($models | ConvertTo-Json) } else { $null }
                         }
                         skipDangerousModePermissionPrompt = $true
                     }
