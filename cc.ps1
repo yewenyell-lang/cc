@@ -663,6 +663,7 @@ function Edit-Profile {
             ANTHROPIC_DEFAULT_OPUS_MODEL = $existingConfig.env.ANTHROPIC_DEFAULT_OPUS_MODEL
             ANTHROPIC_DEFAULT_HAIKU_MODEL = $existingConfig.env.ANTHROPIC_DEFAULT_HAIKU_MODEL
             ANTHROPIC_REASONING_MODEL = $existingConfig.env.ANTHROPIC_REASONING_MODEL
+            ANTHROPIC_MODELS = $existingConfig.env.ANTHROPIC_MODELS
         }
     }
 

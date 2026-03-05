@@ -61,7 +61,9 @@ $script:Border = @{
 function Read-Key {
     $key = $Host.UI.RawUI.ReadKey('NoEcho,IncludeKeyDown')
     # KeyInfo 结构使用 VirtualKeyCode，需要转换为 ConsoleKey 枚举
-    $consoleKey = [ConsoleKey]$key.VirtualKeyCode
+    # 某些键（如 Ctrl）无法转换，使用 TryParse 或默认值
+    $consoleKey = [ConsoleKey]::None
+    [void][Enum]::TryParse([ConsoleKey], $key.VirtualKeyCode.ToString(), [ref]$consoleKey)
     return @{
         Key       = $consoleKey      # [ConsoleKey] 枚举
         Character = $key.Character
@@ -319,8 +321,8 @@ $script:FormFields = @(
     @{ Key = 'name'; Label = '显示名称'; Required = $true }
     @{ Key = 'baseUrl'; Label = 'API 地址'; Required = $true }
     @{ Key = 'token'; Label = '认证令牌'; Required = $true; Masked = $true }
-    @{ Key = 'model'; Label = '默认模型'; Required = $true }
     @{ Key = 'models'; Label = '可选模型'; Required = $false; IsArray = $true }
+    @{ Key = 'model'; Label = '默认模型'; Required = $true }
     @{ Key = 'sonnetModel'; Label = 'Sonnet'; Required = $false }
     @{ Key = 'opusModel'; Label = 'Opus'; Required = $false }
     @{ Key = 'haikuModel'; Label = 'Haiku'; Required = $false }
@@ -426,14 +428,26 @@ function Show-ConfigForm {
                 'reasoningModel' { $values[$key] = $ExistingConfig.env.ANTHROPIC_REASONING_MODEL }
                 'models' {
                     $models = @()
-                    if ($ExistingConfig.env.PSObject.Properties.Name -contains 'ANTHROPIC_MODELS') {
-                        $modelsJson = $ExistingConfig.env.ANTHROPIC_MODELS
-                        if ($modelsJson) {
-                            $models = $modelsJson | ConvertFrom-Json
-                            if ($models -is [String]) {
-                                $models = @($models)
-                            }
+                    $modelsJson = $null
+                    # 支持 PSCustomObject 和 Hashtable 两种类型
+                    if ($ExistingConfig.env -is [System.Management.Automation.PSCustomObject]) {
+                        # PSCustomObject - 使用 PSObject.Properties 检查
+                        if ($ExistingConfig.env.PSObject.Properties.Name -contains 'ANTHROPIC_MODELS') {
+                            $modelsJson = $ExistingConfig.env.ANTHROPIC_MODELS
                         }
+                    } elseif ($ExistingConfig.env -is [hashtable]) {
+                        # Hashtable
+                        if ($ExistingConfig.env.ContainsKey('ANTHROPIC_MODELS')) {
+                            $modelsJson = $ExistingConfig.env['ANTHROPIC_MODELS']
+                        }
+                    }
+                    if ($modelsJson) {
+                        $parsed = $modelsJson | ConvertFrom-Json
+                        if ($parsed -is [String]) {
+                            $parsed = @($parsed)
+                        }
+                        # 过滤掉空字符串
+                        $models = @($parsed | Where-Object { $_ -and $_.Trim() })
                     }
                     $values[$key] = $models
                 }
@@ -508,8 +522,22 @@ function Show-ConfigForm {
 
         Write-LeftBarLine ""
 
-        # 帮助文字
-        Write-LeftBarLine "$($a.BrightBlack)↑↓ 切换 │ Tab 下一项 │ Space 显隐令牌 │ F5 保存 │ Esc 取消$($a.Reset)"
+        # 根据当前字段显示帮助文字
+        $currentFieldHelp = $script:FormFields[$fieldIndex]
+        if ($currentFieldHelp.IsArray) {
+            Write-LeftBarLine "$($a.BrightBlack)↑↓ 切换 │ Enter 编辑可选模型 │ F5 保存 │ Esc 取消$($a.Reset)"
+        } elseif ($currentFieldHelp.Key -match 'Model$') {
+            $availableModels = $values['models']
+            if ($availableModels -and $availableModels.Count -gt 0) {
+                Write-LeftBarLine "$($a.BrightBlack)↑↓ 切换 │ Enter 从可选模型选择 │ F5 保存 │ Esc 取消$($a.Reset)"
+            } else {
+                Write-LeftBarLine "$($a.BrightBlack)↑↓ 切换 │ Tab 下一项 │ F5 保存 │ Esc 取消$($a.Reset)"
+            }
+        } elseif ($currentFieldHelp.Masked) {
+            Write-LeftBarLine "$($a.BrightBlack)↑↓ 切换 │ Tab 下一项 │ Space 显隐令牌 │ F5 保存 │ Esc 取消$($a.Reset)"
+        } else {
+            Write-LeftBarLine "$($a.BrightBlack)↑↓ 切换 │ Tab 下一项 │ F5 保存 │ Esc 取消$($a.Reset)"
+        }
 
         # 读取按键
         $key = Read-Key
@@ -534,6 +562,24 @@ function Show-ConfigForm {
                 if ($currentField.IsArray) {
                     $models = Show-ModelInputForm -ExistingModels $values['models']
                     $values['models'] = $models
+                }
+                # 如果是模型字段，且有可选模型，显示选择器
+                if ($currentField.Key -match 'Model$') {
+                    $availableModels = $values['models']
+                    if ($availableModels -and $availableModels.Count -gt 0) {
+                        $titles = @{
+                            'model' = '选择默认模型'
+                            'sonnetModel' = '选择 Sonnet 模型'
+                            'opusModel' = '选择 Opus 模型'
+                            'haikuModel' = '选择 Haiku 模型'
+                            'reasoningModel' = '选择推理模型'
+                        }
+                        $title = if ($titles.ContainsKey($currentField.Key)) { $titles[$currentField.Key] } else { '选择模型' }
+                        $selectedModel = Show-ModelSelector -Models $availableModels -Title $title
+                        if ($selectedModel) {
+                            $values[$currentField.Key] = $selectedModel
+                        }
+                    }
                 }
             }
             ([ConsoleKey]::Spacebar) {
@@ -578,6 +624,7 @@ function Show-ConfigForm {
                     return @{
                         alias = $values['alias']
                         name = $values['name']
+                        models = $models
                         env = @{
                             ANTHROPIC_AUTH_TOKEN = $values['token']
                             ANTHROPIC_BASE_URL = $values['baseUrl']
@@ -586,7 +633,6 @@ function Show-ConfigForm {
                             ANTHROPIC_DEFAULT_OPUS_MODEL = if ($values['opusModel']) { $values['opusModel'] } else { $model }
                             ANTHROPIC_DEFAULT_HAIKU_MODEL = if ($values['haikuModel']) { $values['haikuModel'] } else { $model }
                             ANTHROPIC_REASONING_MODEL = if ($values['reasoningModel']) { $values['reasoningModel'] } else { $model }
-                            ANTHROPIC_MODELS = if ($models -and $models.Count -gt 0) { ($models | ConvertTo-Json) } else { $null }
                         }
                         skipDangerousModePermissionPrompt = $true
                     }
@@ -622,33 +668,130 @@ function Show-ModelInputForm {
     )
 
     $a = $script:ANSI
-    $models = @() + $ExistingModels
+    # 过滤掉空字符串
+    $models = @($ExistingModels | Where-Object { $_ -and $_.Trim() })
+    $selectedIndex = 0
+    $mode = 'select'  # 'select' 或 'input' 或 'edit'
+    $inputBuffer = ''
+    $editIndex = -1
+
+    Hide-Cursor
 
     while ($true) {
         Clear-Screen
         Write-Host ""
-        Write-LeftBarLine "$($a.Cyan)添加可选模型$($a.Reset)"
+        Write-LeftBarLine "$($a.Cyan)可选模型配置$($a.Reset)"
         Write-LeftBarLine ""
 
         if ($models.Count -gt 0) {
             Write-LeftBarLine "已添加的模型："
             for ($i = 0; $i -lt $models.Count; $i++) {
-                Write-LeftBarLine "  $($i + 1). $($models[$i])"
+                $prefix = if ($i -eq $selectedIndex) { "$($a.Cyan)▶$($a.Reset)" } else { " " }
+                $num = "$($i + 1).".PadRight(4)
+                Write-LeftBarLine "$prefix $num$($models[$i])"
             }
+            Write-LeftBarLine ""
+        } else {
+            Write-LeftBarLine "$($a.BrightBlack)暂无模型，按 A 添加$($a.Reset)"
             Write-LeftBarLine ""
         }
 
-        Write-LeftBarLine "输入模型 ID（回车添加，空行结束）："
-        Write-LeftBarLine ""
-
-        $input = Read-Host
-        if ([string]::IsNullOrWhiteSpace($input)) {
-            break
+        if ($mode -eq 'input') {
+            Write-LeftBarLine "$($a.Yellow)输入新模型 ID：$($a.Reset)$inputBuffer"
+            Write-LeftBarLine ""
+            Write-LeftBarLine "$($a.BrightBlack)Enter 确认 │ Esc 取消$($a.Reset)"
+        } elseif ($mode -eq 'edit') {
+            Write-LeftBarLine "$($a.Yellow)编辑模型 ID：$($a.Reset)$inputBuffer"
+            Write-LeftBarLine ""
+            Write-LeftBarLine "$($a.BrightBlack)Enter 确认 │ Esc 取消$($a.Reset)"
+        } else {
+            Write-LeftBarLine "$($a.BrightBlack)↑↓ 选择 │ A 添加 │ E 编辑 │ D 删除 │ Enter 完成 │ Esc 取消$($a.Reset)"
         }
-        $models += $input.Trim()
-    }
 
-    return $models
+        $key = Read-Key
+
+        if ($mode -eq 'input' -or $mode -eq 'edit') {
+            # 输入/编辑模式
+            switch ($key.Key) {
+                ([ConsoleKey]::Enter) {
+                    if (-not [string]::IsNullOrWhiteSpace($inputBuffer)) {
+                        if ($mode -eq 'input') {
+                            $models += $inputBuffer.Trim()
+                            $selectedIndex = $models.Count - 1
+                        } else {
+                            $models[$editIndex] = $inputBuffer.Trim()
+                        }
+                    }
+                    $mode = 'select'
+                    $inputBuffer = ''
+                    $editIndex = -1
+                }
+                ([ConsoleKey]::Escape) {
+                    $mode = 'select'
+                    $inputBuffer = ''
+                    $editIndex = -1
+                }
+                ([ConsoleKey]::Backspace) {
+                    if ($inputBuffer.Length -gt 0) {
+                        $inputBuffer = $inputBuffer.Substring(0, $inputBuffer.Length - 1)
+                    }
+                }
+                default {
+                    $c = $key.Character
+                    if ($c -and ([char]::IsLetterOrDigit($c) -or $c -eq '-' -or $c -eq '_' -or $c -eq '.' -or $c -eq ':')) {
+                        $inputBuffer += $c
+                    }
+                }
+            }
+        } else {
+            # 选择模式
+            switch ($key.Key) {
+                ([ConsoleKey]::UpArrow) {
+                    if ($models.Count -gt 0) {
+                        $selectedIndex = [Math]::Max(0, $selectedIndex - 1)
+                    }
+                }
+                ([ConsoleKey]::DownArrow) {
+                    if ($models.Count -gt 0) {
+                        $selectedIndex = [Math]::Min($models.Count - 1, $selectedIndex + 1)
+                    }
+                }
+                ([ConsoleKey]::Enter) {
+                    Show-Cursor
+                    return $models
+                }
+                ([ConsoleKey]::Escape) {
+                    Show-Cursor
+                    return $ExistingModels
+                }
+                ([ConsoleKey]::A) {
+                    $mode = 'input'
+                    $inputBuffer = ''
+                }
+                ([ConsoleKey]::D) {
+                    if ($models.Count -gt 0) {
+                        $newModels = @()
+                        for ($i = 0; $i -lt $models.Count; $i++) {
+                            if ($i -ne $selectedIndex) {
+                                $newModels += $models[$i]
+                            }
+                        }
+                        $models = $newModels
+                        if ($selectedIndex -ge $models.Count) {
+                            $selectedIndex = [Math]::Max(0, $models.Count - 1)
+                        }
+                    }
+                }
+                ([ConsoleKey]::E) {
+                    if ($models.Count -gt 0) {
+                        $mode = 'edit'
+                        $editIndex = $selectedIndex
+                        $inputBuffer = $models[$selectedIndex]
+                    }
+                }
+            }
+        }
+    }
 }
 
 # 显示模型选择器
@@ -689,18 +832,18 @@ function Show-ModelSelector {
 
         $key = Read-Key
 
-        switch ($key) {
-            'ArrowUp' {
+        switch ($key.Key) {
+            ([ConsoleKey]::UpArrow) {
                 $selectedIndex = [Math]::Max(0, $selectedIndex - 1)
             }
-            'ArrowDown' {
+            ([ConsoleKey]::DownArrow) {
                 $selectedIndex = [Math]::Min($Models.Count - 1, $selectedIndex + 1)
             }
-            'Enter' {
+            ([ConsoleKey]::Enter) {
                 Show-Cursor
                 return $Models[$selectedIndex]
             }
-            'Escape' {
+            ([ConsoleKey]::Escape) {
                 Show-Cursor
                 return $null
             }
