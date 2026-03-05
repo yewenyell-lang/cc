@@ -115,6 +115,114 @@ function Initialize-SyncConfig {
     }
 }
 
+# 比较并合并 profiles
+function Merge-Profiles {
+    param(
+        [string]$LocalDir,
+        [string]$RemoteDir,
+        [string]$Mode = "sync"  # sync, push, pull
+    )
+
+    $results = @{
+        uploaded = @()
+        downloaded = @()
+        skipped = @()
+    }
+
+    # 获取本地和远程文件列表
+    $localFiles = @{}
+    $remoteFiles = @{}
+
+    if (Test-Path "$LocalDir/*.json") {
+        Get-ChildItem "$LocalDir/*.json" | ForEach-Object {
+            $content = Get-Content $_.FullName | ConvertFrom-Json
+            $localFiles[$_.Name] = @{
+                path = $_.FullName
+                updatedAt = $content.updatedAt
+            }
+        }
+    }
+
+    if (Test-Path "$RemoteDir/*.json") {
+        Get-ChildItem "$RemoteDir/*.json" | ForEach-Object {
+            $content = Get-Content $_.FullName | ConvertFrom-Json
+            $remoteFiles[$_.Name] = @{
+                path = $_.FullName
+                updatedAt = $content.updatedAt
+            }
+        }
+    }
+
+    # 合并逻辑
+    $allFiles = @{}
+    $localFiles.Keys | ForEach-Object { $allFiles[$_] = $true }
+    $remoteFiles.Keys | ForEach-Object { $allFiles[$_] = $true }
+
+    foreach ($fileName in $allFiles.Keys) {
+        $local = $localFiles[$fileName]
+        $remote = $remoteFiles[$fileName]
+
+        if ($Mode -eq "push") {
+            # 仅上传模式
+            if ($local -and -not $remote) {
+                Copy-Item $local.path "$RemoteDir/$fileName"
+                $results.uploaded += $fileName
+            }
+            elseif ($local -and $remote) {
+                if ($local.updatedAt -gt $remote.updatedAt) {
+                    Copy-Item $local.path "$RemoteDir/$fileName"
+                    $results.uploaded += $fileName
+                }
+                else {
+                    $results.skipped += $fileName
+                }
+            }
+        }
+        elseif ($Mode -eq "pull") {
+            # 仅下载模式
+            if ($remote -and -not $local) {
+                Copy-Item $remote.path "$LocalDir/$fileName"
+                $results.downloaded += $fileName
+            }
+            elseif ($local -and $remote) {
+                if ($remote.updatedAt -gt $local.updatedAt) {
+                    Copy-Item $remote.path "$LocalDir/$fileName"
+                    $results.downloaded += $fileName
+                }
+                else {
+                    $results.skipped += $fileName
+                }
+            }
+        }
+        else {
+            # 双向同步模式
+            if ($local -and -not $remote) {
+                Copy-Item $local.path "$RemoteDir/$fileName"
+                $results.uploaded += $fileName
+            }
+            elseif (-not $local -and $remote) {
+                Copy-Item $remote.path "$LocalDir/$fileName"
+                $results.downloaded += $fileName
+            }
+            elseif ($local -and $remote) {
+                if ($local.updatedAt -gt $remote.updatedAt) {
+                    Copy-Item $local.path "$RemoteDir/$fileName"
+                    $results.uploaded += $fileName
+                }
+                elseif ($remote.updatedAt -gt $local.updatedAt) {
+                    Copy-Item $remote.path "$LocalDir/$fileName"
+                    $results.downloaded += $fileName
+                }
+                else {
+                    $results.skipped += $fileName
+                }
+            }
+        }
+    }
+
+    return $results
+}
+
 # 获取所有配置
 function Get-Profiles {
     param([string]$CurrentAlias)
