@@ -37,6 +37,47 @@ function Test-SyncEnvironment {
     return $true
 }
 
+# 获取同步配置
+function Get-SyncConfig {
+    if (-not (Test-Path $script:CONFIG_FILE)) {
+        return $null
+    }
+
+    try {
+        $config = Get-Content $script:CONFIG_FILE | ConvertFrom-Json
+        return $config.sync
+    }
+    catch {
+        return $null
+    }
+}
+
+# 保存同步配置
+function Set-SyncConfig {
+    param(
+        [string]$RepoUrl,
+        [string]$Branch = "main"
+    )
+
+    # 读取现有配置或创建新配置
+    if (Test-Path $script:CONFIG_FILE) {
+        $config = Get-Content $script:CONFIG_FILE | ConvertFrom-Json
+    }
+    else {
+        $config = @{}
+    }
+
+    # 更新 sync 配置
+    $config.sync = @{
+        repoUrl = $RepoUrl
+        branch = $Branch
+        lastSync = $null
+    }
+
+    # 保存配置
+    $config | ConvertTo-Json -Depth 10 | Set-Content $script:CONFIG_FILE -Encoding UTF8
+}
+
 # 获取所有配置
 function Get-Profiles {
     param([string]$CurrentAlias)
