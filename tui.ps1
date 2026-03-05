@@ -424,22 +424,9 @@ function Show-ConfigForm {
                 'opusModel' { $values[$key] = $ExistingConfig.env.ANTHROPIC_DEFAULT_OPUS_MODEL }
                 'haikuModel' { $values[$key] = $ExistingConfig.env.ANTHROPIC_DEFAULT_HAIKU_MODEL }
                 'reasoningModel' { $values[$key] = $ExistingConfig.env.ANTHROPIC_REASONING_MODEL }
-                'models' {
-                    $models = @()
-                    if ($ExistingConfig.env.PSObject.Properties.Name -contains 'ANTHROPIC_MODELS') {
-                        $modelsJson = $ExistingConfig.env.ANTHROPIC_MODELS
-                        if ($modelsJson) {
-                            $models = $modelsJson | ConvertFrom-Json
-                            if ($models -is [String]) {
-                                $models = @($models)
-                            }
-                        }
-                    }
-                    $values[$key] = $models
-                }
             }
         } else {
-            $values[$key] = if ($field.IsArray) { @() } else { '' }
+            $values[$key] = ''
         }
     }
 
@@ -473,9 +460,6 @@ function Show-ConfigForm {
             # 显示值（令牌可隐藏）
             $displayValue = if ($field.Masked -and -not $tokenVisible -and $value) {
                 '*' * [Math]::Min($value.Length, 20)
-            } elseif ($field.IsArray -and $value -is [array]) {
-                $modelCount = $value.Count
-                "($modelCount 个模型)"
             } else {
                 $value
             }
@@ -530,11 +514,6 @@ function Show-ConfigForm {
                 if ($currentField.Masked) {
                     $tokenVisible = -not $tokenVisible
                 }
-                # 如果是 models 字段，调出模型输入表单
-                if ($currentField.Key -eq 'models') {
-                    $models = Show-ModelInputForm -ExistingModels $values['models']
-                    $values['models'] = $models
-                }
             }
             ([ConsoleKey]::Spacebar) {
                 if ($currentField.Masked) {
@@ -585,19 +564,6 @@ function Show-ConfigForm {
                             ANTHROPIC_DEFAULT_OPUS_MODEL = if ($values['opusModel']) { $values['opusModel'] } else { $model }
                             ANTHROPIC_DEFAULT_HAIKU_MODEL = if ($values['haikuModel']) { $values['haikuModel'] } else { $model }
                             ANTHROPIC_REASONING_MODEL = if ($values['reasoningModel']) { $values['reasoningModel'] } else { $model }
-                'models' {
-                    $models = @()
-                    if ($ExistingConfig.env.PSObject.Properties.Name -contains 'ANTHROPIC_MODELS') {
-                        $modelsJson = $ExistingConfig.env.ANTHROPIC_MODELS
-                        if ($modelsJson) {
-                            $models = $modelsJson | ConvertFrom-Json
-                            if ($models -is [String]) {
-                                $models = @($models)
-                            }
-                        }
-                    }
-                    $values[$key] = $models
-                }
                         }
                         skipDangerousModePermissionPrompt = $true
                     }
@@ -624,6 +590,7 @@ function Show-ConfigForm {
     }
 }
 
+
 # 显示模型输入表单
 function Show-ModelInputForm {
     param(
@@ -640,7 +607,6 @@ function Show-ModelInputForm {
         Write-LeftBarLine "$($a.Cyan)添加可选模型$($a.Reset)"
         Write-LeftBarLine ""
 
-        # 显示已添加的模型
         if ($models.Count -gt 0) {
             Write-LeftBarLine "已添加的模型："
             for ($i = 0; $i -lt $models.Count; $i++) {
@@ -652,14 +618,6 @@ function Show-ModelInputForm {
         Write-LeftBarLine "输入模型 ID（回车添加，空行结束）："
         Write-LeftBarLine ""
 
-        # 显示输入框
-        $inputBox = "[                              ]"
-        Write-LeftBarLine "  $inputBox"
-
-        Write-LeftBarLine ""
-        Write-LeftBarLine "$($a.BrightBlack)↑↓ 上下移动 │ 回车 添加 │ Delete 删除 │ Esc 完成$($a.Reset)"
-
-        # 读取输入
         $input = Read-Host
         if ([string]::IsNullOrWhiteSpace($input)) {
             break
@@ -692,7 +650,6 @@ function Show-ModelSelector {
         Write-Host ""
         Write-Host ""
 
-        # 显示模型列表
         for ($i = 0; $i -lt $Models.Count; $i++) {
             $model = $Models[$i]
             if ($i -eq $selectedIndex) {
