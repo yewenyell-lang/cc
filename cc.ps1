@@ -511,11 +511,26 @@ function New-Profile {
     $result = Show-ConfigForm -ExistingAliases $existingAliases
 
     if ($result) {
-        # 保存配置文件
+        # 处理 models 数组，保存到环境变量
+        $envVars = @{}
+        foreach ($key in $result.env.Keys) {
+            $envVars[$key] = $result.env[$key]
+        }
+        if ($result.models -and $result.models.Count -gt 0) {
+            $envVars['ANTHROPIC_MODELS'] = ($result.models | ConvertTo-Json)
+        }
+
+        # 构建保存对象
+        $profileData = @{
+            alias = $result.alias
+            name = $result.name
+            skipDangerousModePermissionPrompt = $true
+            env = $envVars
+        }
+        $profileData | Add-Member -NotePropertyName "updatedAt" -NotePropertyValue (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ") -Force
+
         $profilePath = "$script:PROFILES_DIR/$($result.alias).json"
-        # 添加时间戳
-        $result | Add-Member -NotePropertyName "updatedAt" -NotePropertyValue (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ") -Force
-        $result | ConvertTo-Json -Depth 10 | Set-Content $profilePath -Encoding UTF8
+        $profileData | ConvertTo-Json -Depth 10 | Set-Content $profilePath -Encoding UTF8
 
         Write-Host ""
         Write-Host "$($ANSI.Green)✓$($ANSI.Reset) 配置 '$($result.alias)' 创建成功" -ForegroundColor Green
@@ -926,3 +941,5 @@ switch ($command) {
     'sync' { Sync-Profiles -Mode $param }
     default { Write-Host "未知命令: $command" -ForegroundColor Red; Show-Help }
 }
+
+
