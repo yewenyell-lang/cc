@@ -20,10 +20,21 @@ Claude Code 配置管理工具 - 轻松管理多个 Claude Code API 配置。
 irm https://raw.githubusercontent.com/yewenyell-lang/cc/main/install.ps1 | iex
 ```
 
+### 国内镜像（Gitee）
+
+```powershell
+irm https://gitee.com/yell-run/cc/raw/main/install.ps1 | iex
+```
+
 ### 本地安装
 
 ```powershell
+# GitHub
 git clone https://github.com/yewenyell-lang/cc.git
+
+# Gitee 镜像
+git clone https://gitee.com/yell-run/cc.git
+
 cd cc
 pwsh -NoProfile -ExecutionPolicy Bypass -File  -LocalSourcePath .
 ```
@@ -49,7 +60,7 @@ pwsh -NoProfile -ExecutionPolicy Bypass -File  -LocalSourcePath .
 | `cc test [alias]` | 测试 API 连接（无参数显示选择器） |
 | `cc ccswitch` | 从 cc-switch 迁移配置 |
 | `cc uninstall` | 卸载 cc |
-| `cc update` | 更新 cc 到最新版本 |
+| `cc update [github\|gitee]` | 更新 cc 到最新版本（可选指定源） |
 | `cc sync [push\|pull]` | 同步配置到/从远程仓库 |
 
 ## 使用示例
@@ -98,6 +109,21 @@ cc uninstall
 # 强制卸载（不询问确认）
 cc uninstall -Force
 ```
+
+### 更新
+
+```powershell
+# 交互式选择更新源（首次会提示选择）
+cc update
+
+# 强制使用 GitHub 源
+cc update github
+
+# 强制使用 Gitee 源（国内镜像）
+cc update gitee
+```
+
+更新源选择后会保存到配置，下次无需再次选择。如果下载失败，会提示是否切换到另一个源重试。
 
 ### 同步配置
 

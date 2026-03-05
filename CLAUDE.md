@@ -44,22 +44,22 @@ cc sync pull
 cc uninstall
 
 # 更新 cc
-cc update
+cc update [github|gitee]  # 可选指定更新源
 ```
 
 ## 代码架构
 
 ### 主要文件
 
-- **cc.ps1** (~1075行) - 主入口脚本，包含所有核心功能函数和命令处理
-- **tui.ps1** (~850行) - TUI 界面模块，提供选择器、表单等交互功能，定义 ANSI 转义序列常量
+- **cc.ps1** (~1165行) - 主入口脚本，包含所有核心功能函数和命令处理
+- **tui.ps1** (~855行) - TUI 界面模块，提供选择器、表单等交互功能，定义 ANSI 转义序列常量
 - **ccswitch.ps1** - 从 cc-switch 迁移配置的功能模块
 - **install.ps1** - 安装脚本
 - **update.ps1** - 更新脚本
 
 ### 命令入口
 
-主入口在 `cc.ps1` 底部（约第1058-1074行），通过 `switch` 语句根据 `$args[0]` 分发到不同函数：
+主入口在 `cc.ps1` 底部（约第1142-1158行），通过 `switch` 语句根据 `$args[0]` 分发到不同函数：
 
 - `use` → `Use-Profile`
 - `list`/`ls` → `Show-List`
@@ -69,6 +69,7 @@ cc update
 - `test` → `Test-Profile`
 - `ccswitch` → `Import-FromCcSwitch`
 - `uninstall` → `Uninstall-Cc`
+- `update` → `Update-Cc`
 - `sync` → `Sync-Profiles`
 
 ### TUI 模块 (tui.ps1)
@@ -87,7 +88,7 @@ cc update
 - **配置目录**: `~/.cc/`
 - **配置文件**: `~/.cc/profiles/*.json`
 - **当前配置**: `~/.cc/current`
-- **全局配置**: `~/.cc/config.json`
+- **全局配置**: `~/.cc/config.json` - 存储 `updateSource` 等全局设置
 - **删除记录**: `~/.cc/deleted.json` - 记录已删除的配置，防止 sync pull 恢复
 
 ### 同步功能
@@ -96,6 +97,14 @@ cc update
 - 使用 `~/.cc/deleted.json` 记录已删除的配置名
 - pull 时跳过已删除的配置，避免恢复
 - push 时将删除记录同步到远程
+
+### 更新功能
+
+`Update-Cc` 函数支持多源更新：
+- `$script:UPDATE_SOURCES` 定义 GitHub 和 Gitee 两个更新源 URL
+- 更新源选择保存到 `~/.cc/config.json` 的 `updateSource` 字段
+- 下载失败时自动询问是否切换到另一个源重试
+- `Get-GlobalConfig`/`Set-UpdateSource` 函数管理全局配置读写
 
 ## 开发说明
 

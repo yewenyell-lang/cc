@@ -12,6 +12,12 @@ $script:PROFILES_DIR = "$script:CC_DIR/profiles"
 $script:CURRENT_FILE = "$script:CC_DIR/current"
 $script:CONFIG_FILE = "$script:CC_DIR/config.json"
 
+# 更新源配置
+$script:UPDATE_SOURCES = @{
+    github = "https://raw.githubusercontent.com/yewenyell-lang/cc/main/update.ps1"
+    gitee = "https://gitee.com/yell-run/cc/raw/main/update.ps1"
+}
+
 # 导入 cc-switch 迁移模块
 . "$PSScriptRoot/ccswitch.ps1"
 
@@ -1030,11 +1036,77 @@ function Uninstall-Cc {
     & pwsh -NoProfile -ExecutionPolicy Bypass -File $uninstallScript @Args
 }
 
+# 获取全局配置
+function Get-GlobalConfig {
+    if (Test-Path $script:CONFIG_FILE) {
+        try {
+            return Get-Content $script:CONFIG_FILE | ConvertFrom-Json
+        } catch {
+            return @{}
+        }
+    }
+    return @{}
+}
+
+# 保存更新源配置
+function Set-UpdateSource {
+    param([string]$Source)
+    $config = Get-GlobalConfig
+    $config | Add-Member -NotePropertyName 'updateSource' -NotePropertyValue $Source -Force
+    $config | ConvertTo-Json -Depth 10 | Set-Content $script:CONFIG_FILE -Encoding UTF8
+}
+
+# 选择更新源
+function Select-UpdateSource {
+    Write-Host ""
+    Write-Host "请选择更新源:" -ForegroundColor Cyan
+    Write-Host "  1. GitHub (推荐)"
+    Write-Host "  2. Gitee (国内镜像)"
+    Write-Host ""
+
+    while ($true) {
+        $choice = Read-Host "请输入选项 (1/2)"
+        switch ($choice) {
+            '1' {
+                Set-UpdateSource -Source 'github'
+                return 'github'
+            }
+            '2' {
+                Set-UpdateSource -Source 'gitee'
+                return 'gitee'
+            }
+            default {
+                Write-Host "无效选项，请重新输入" -ForegroundColor Red
+            }
+        }
+    }
+}
+
 # 更新 cc
 function Update-Cc {
-    $UPDATE_URL = "https://raw.githubusercontent.com/yewenyell-lang/cc/main/update.ps1"
+    param([string]$Source)
 
-    Write-Host "正在更新 cc..." -ForegroundColor Cyan
+    # 确定更新源
+    if ($Source -and $script:UPDATE_SOURCES.ContainsKey($Source)) {
+        # 命令行指定了有效源
+        $useSource = $Source
+        Set-UpdateSource -Source $Source
+    } else {
+        # 读取已保存的源
+        $config = Get-GlobalConfig
+        $savedSource = $config.updateSource
+        if ($savedSource -and $script:UPDATE_SOURCES.ContainsKey($savedSource)) {
+            $useSource = $savedSource
+        } else {
+            # 没有保存的源，让用户选择
+            $useSource = Select-UpdateSource
+            if (-not $useSource) { return }
+        }
+    }
+
+    # 执行更新
+    $UPDATE_URL = $script:UPDATE_SOURCES[$useSource]
+    Write-Host "正在更新 cc... (源: $useSource)" -ForegroundColor Cyan
 
     try {
         Invoke-WebRequest -Uri $UPDATE_URL -OutFile "$env:TEMP\cc-update.ps1" -ErrorAction Stop
@@ -1044,8 +1116,20 @@ function Update-Cc {
     catch {
         Write-Host ""
         Write-Host "$($ANSI.BrightRed)✗$($ANSI.Reset) 更新失败: $_" -ForegroundColor Red
-        Write-Host "请手动运行以下命令进行更新:" -ForegroundColor Yellow
-        Write-Host "  irm https://raw.githubusercontent.com/yewenyell-lang/cc/main/update.ps1 | iex" -ForegroundColor Cyan
+
+        # 询问是否换源
+        $otherSource = if ($useSource -eq 'github') { 'gitee' } else { 'github' }
+        Write-Host ""
+        $choice = Read-Host "是否切换到 $otherSource 重试? (y/n)"
+
+        if ($choice -eq 'y' -or $choice -eq 'Y') {
+            Update-Cc -Source $otherSource
+        } else {
+            Write-Host ""
+            Write-Host "手动更新命令:" -ForegroundColor Yellow
+            Write-Host "  cc update github" -ForegroundColor Cyan
+            Write-Host "  cc update gitee" -ForegroundColor Cyan
+        }
     }
 }
 
@@ -1068,7 +1152,7 @@ switch ($command) {
     'test' { Test-Profile -Alias $param }
     'ccswitch' { Import-FromCcSwitch }
     'uninstall' { Uninstall-Cc -Args $args[1..($args.Length-1)] }
-    'update' { Update-Cc }
+    'update' { Update-Cc -Source $param }
     'sync' { Sync-Profiles -Mode $param }
     default { Write-Host "未知命令: $command" -ForegroundColor Red; Show-Help }
 }
