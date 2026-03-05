@@ -643,14 +643,15 @@ function Show-ConfigForm {
                 return $null
             }
             default {
-                # 字符输入
-                if ($key.Character -and [char]::IsControl($key.Character) -eq $false) {
+                # 只处理可打印 ASCII 字符 (32-126)，忽略所有无关键
+                $char = $key.Character
+                if ($char -and [int][char]$char -ge 32 -and [int][char]$char -le 126) {
                     # 编辑模式且当前是别名字段，不允许修改
                     if ($IsEdit -and $currentField.Key -eq 'alias') {
                         continue
                     }
 
-                    $values[$currentField.Key] += $key.Character
+                    $values[$currentField.Key] += $char
                     # 清除该字段错误
                     $errors[$currentField.Key] = $null
                 }
@@ -737,8 +738,9 @@ function Show-ModelInputForm {
                     }
                 }
                 default {
+                    # 只处理可打印 ASCII 字符 (32-126)，忽略所有无关键
                     $c = $key.Character
-                    if ($c -and ([char]::IsLetterOrDigit($c) -or $c -eq '-' -or $c -eq '_' -or $c -eq '.' -or $c -eq ':')) {
+                    if ($c -and [int][char]$c -ge 32 -and [int][char]$c -le 126) {
                         $inputBuffer += $c
                     }
                 }

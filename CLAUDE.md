@@ -50,9 +50,9 @@ cc update
 
 ### 主要文件
 
-- **cc.ps1** (928行) - 主入口脚本，包含所有核心功能函数和命令处理
-- **tui.ps1** (590行) - TUI 界面模块，提供选择器、表单等交互功能
-- **ccswitch.ps1** (163行) - 从 cc-switch 迁移配置的功能模块
+- **cc.ps1** (988行) - 主入口脚本，包含所有核心功能函数和命令处理
+- **tui.ps1** (853行) - TUI 界面模块，提供选择器、表单等交互功能
+- **ccswitch.ps1** - 从 cc-switch 迁移配置的功能模块
 - **install.ps1** - 安装脚本
 - **update.ps1** - 更新脚本
 
@@ -76,6 +76,10 @@ cc update
 - `Show-ProfileSelector` - 配置选择器（上下键选择）
 - `Show-MultiSelectSelector` - 多选选择器
 - `Show-ConfigForm` - 配置表单（创建/编辑配置）
+- `Show-ModelInputForm` - 可选模型管理（添加/编辑/删除模型ID）
+- `Show-ModelSelector` - 模型选择器（从可选模型列表选择）
+
+表单字段定义在 `$script:FormFields` 数组中，支持 `IsArray=$true` 属性处理数组类型字段。
 
 ### 配置存储
 
