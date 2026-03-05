@@ -6,6 +6,7 @@ Claude Code 配置管理工具 - 轻松管理多个 Claude Code API 配置。
 
 - 🎯 **多配置管理** - 创建和管理多个 API 配置文件
 - 🔄 **快速切换** - 一键切换不同配置并启动 Claude Code
+- 🤖 **无头模式** - 支持传递任意参数给 Claude Code，实现自动化执行
 - ✅ **连接测试** - 测试 API 连接是否正常
 - 📦 **一键安装** - 从 GitHub 快速安装
 - 🗑️ **干净卸载** - 完整移除所有相关文件
@@ -40,7 +41,7 @@ pwsh -NoProfile -ExecutionPolicy Bypass -File  -LocalSourcePath .
 | 命令 | 说明 |
 |------|------|
 | `cc` | 显示帮助信息和当前配置 |
-| `cc use [alias]` | 切换配置并启动 Claude Code（无参数显示选择器） |
+| `cc use [alias] [args...]` | 切换配置并启动 Claude Code，可传递额外参数（如 `-p "查询"`） |
 | `cc list`, `cc ls` | 列出所有配置 |
 | `cc new` | 创建新配置 |
 | `cc edit [alias]` | 编辑配置（无参数显示选择器） |
@@ -74,6 +75,12 @@ cc use
 
 # 直接切换到指定配置
 cc use myapi
+
+# 无头模式：执行单次查询后退出
+cc use myapi -p "分析这段代码的问题"
+
+# 无头模式：使用指定模型执行任务
+cc use myapi --model claude-sonnet-4-6 -p "优化这个函数"
 ```
 
 ### 测试连接

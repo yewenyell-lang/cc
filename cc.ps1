@@ -628,7 +628,10 @@ function New-Profile {
 
 # 切换配置并启动 Claude Code
 function Use-Profile {
-    param([string]$Alias)
+    param(
+        [string]$Alias,
+        [string[]]$ExtraArgs
+    )
 
     $currentAlias = Get-CurrentAlias
     $profiles = Get-Profiles -CurrentAlias $currentAlias
@@ -676,9 +679,23 @@ function Use-Profile {
 
         # 清空屏幕，只保留启动提示
         Clear-Host
-        Write-Host "启动 Claude Code (配置: $Alias)..." -ForegroundColor Cyan
+
+        # 构建并显示完整命令
+        $displayParts = @("claude", "--settings `"$tempPath`"", "--dangerously-skip-permissions")
+        if ($ExtraArgs -and $ExtraArgs.Count -gt 0) {
+            foreach ($arg in $ExtraArgs) {
+                if ($arg -match '\s') {
+                    $displayParts += "`"$arg`""
+                } else {
+                    $displayParts += $arg
+                }
+            }
+        }
+        Write-Host "启动 Claude Code (配置: $Alias)" -ForegroundColor Cyan
+        Write-Host "命令: $($displayParts -join ' ')" -ForegroundColor DarkGray
         Write-Host ""
-        & claude --settings $tempPath --dangerously-skip-permissions
+
+        & claude --settings $tempPath --dangerously-skip-permissions @ExtraArgs
     }
     finally {
         # 清理临时文件
@@ -1040,7 +1057,10 @@ $param = $args[1]
 
 switch ($command) {
     $null { Show-Help }
-    'use' { Use-Profile -Alias $param }
+    'use' {
+        $extraArgs = if ($args.Count -gt 2) { $args[2..($args.Count-1)] } else { @() }
+        Use-Profile -Alias $param -ExtraArgs $extraArgs
+    }
     { $_ -in 'list', 'ls' } { Show-List }
     'new' { New-Profile }
     'edit' { Edit-Profile -Alias $param }

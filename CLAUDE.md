@@ -13,8 +13,9 @@ cc 是 Claude Code 配置管理工具，使用 PowerShell 7.0 编写，用于管
 cc
 
 # 切换配置并启动 Claude Code
-cc use [alias]
-cc use  # 显示选择器
+cc use [alias]           # 直接切换
+cc use [alias] [args...] # 切换并传递额外参数给 claude（如 -c "查询"）
+cc use                   # 显示选择器
 
 # 列出所有配置
 cc list
@@ -50,7 +51,7 @@ cc update
 
 ### 主要文件
 
-- **cc.ps1** (~990行) - 主入口脚本，包含所有核心功能函数和命令处理
+- **cc.ps1** (~1075行) - 主入口脚本，包含所有核心功能函数和命令处理
 - **tui.ps1** (~850行) - TUI 界面模块，提供选择器、表单等交互功能，定义 ANSI 转义序列常量
 - **ccswitch.ps1** - 从 cc-switch 迁移配置的功能模块
 - **install.ps1** - 安装脚本
@@ -58,7 +59,7 @@ cc update
 
 ### 命令入口
 
-主入口在 `cc.ps1` 底部（约第974-987行），通过 `switch` 语句根据 `$args[0]` 分发到不同函数：
+主入口在 `cc.ps1` 底部（约第1058-1074行），通过 `switch` 语句根据 `$args[0]` 分发到不同函数：
 
 - `use` → `Use-Profile`
 - `list`/`ls` → `Show-List`
@@ -87,10 +88,26 @@ cc update
 - **配置文件**: `~/.cc/profiles/*.json`
 - **当前配置**: `~/.cc/current`
 - **全局配置**: `~/.cc/config.json`
+- **删除记录**: `~/.cc/deleted.json` - 记录已删除的配置，防止 sync pull 恢复
+
+### 同步功能
+
+`Sync-Profiles` 函数实现了配置的 Git 同步：
+- 使用 `~/.cc/deleted.json` 记录已删除的配置名
+- pull 时跳过已删除的配置，避免恢复
+- push 时将删除记录同步到远程
 
 ## 开发说明
 
 这是纯 PowerShell 脚本项目，无需构建或编译。修改后直接运行测试即可。
+
+```powershell
+# 语法检查
+pwsh -NoProfile -Command "Get-Content cc.ps1 | ForEach-Object { [scriptblock]::Create($_) }" 2>$null; if ($?) { "OK" }
+
+# 快速功能测试
+. ./cc.ps1  # 在当前 shell 中加载函数，然后手动调用
+```
 
 ## Code Quality Checklist
 
