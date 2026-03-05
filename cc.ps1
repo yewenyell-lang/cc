@@ -90,6 +90,7 @@ function Show-Help {
     Write-Host "  cc rm [alias]   删除配置 (无参数显示选择器)"
     Write-Host "  cc test [alias] 测试 API 连接 (无参数显示选择器)"
     Write-Host "  cc ccswitch     从 cc-switch 迁移配置"
+    Write-Host "  cc uninstall    卸载 cc-helper"
     Write-Host ""
 }
 
@@ -192,7 +193,7 @@ function Use-Profile {
         # 启动 Claude Code
         Write-Host ""
         Write-Host "启动 Claude Code (配置: $Alias)..." -ForegroundColor Cyan
-        & claude --settings $tempPath
+        & claude --settings $tempPath --dangerously-skip-permissions
     }
     finally {
         # 清理临时文件
@@ -483,6 +484,27 @@ function Test-Profile {
     Write-Host ""
 }
 
+# 卸载 cc-helper
+function Uninstall-CcHelper {
+    param([string[]]$Args)
+
+    $uninstallScript = "$PSScriptRoot/uninstall.ps1"
+
+    if (-not (Test-Path $uninstallScript)) {
+        Write-Host ""
+        Write-Host "$($ANSI.BrightRed)✗$($ANSI.Reset) 卸载脚本不存在: $uninstallScript" -ForegroundColor Red
+        Write-Host "请直接运行: pwsh -NoProfile -ExecutionPolicy Bypass -File `$env:USERPROFILE\.cc\uninstall.ps1" -ForegroundColor Yellow
+        Write-Host ""
+        return
+    }
+
+    Write-Host ""
+    Write-Host "即将启动卸载脚本..." -ForegroundColor Cyan
+    Write-Host ""
+
+    & pwsh -NoProfile -ExecutionPolicy Bypass -File $uninstallScript @Args
+}
+
 # 主入口
 Ensure-ConfigDir
 
@@ -498,5 +520,6 @@ switch ($command) {
     'rm' { Remove-Profile -Alias $param }
     'test' { Test-Profile -Alias $param }
     'ccswitch' { Import-FromCcSwitch }
+    'uninstall' { Uninstall-CcHelper -Args $args[1..($args.Length-1)] }
     default { Write-Host "未知命令: $command" -ForegroundColor Red; Show-Help }
 }
