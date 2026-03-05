@@ -669,3 +669,61 @@ function Show-ModelInputForm {
 
     return $models
 }
+
+# 显示模型选择器
+function Show-ModelSelector {
+    param(
+        [Parameter(Mandatory=$true)]
+        [string[]]$Models,
+
+        [Parameter(Mandatory=$false)]
+        [string]$Title = "选择模型"
+    )
+
+    $a = $script:ANSI
+    $selectedIndex = 0
+
+    Hide-Cursor
+
+    while ($true) {
+        Clear-Screen
+        Write-Host ""
+        Write-Host " ┌─ $Title ─┐" -NoNewline
+        Write-Host ""
+        Write-Host ""
+
+        # 显示模型列表
+        for ($i = 0; $i -lt $Models.Count; $i++) {
+            $model = $Models[$i]
+            if ($i -eq $selectedIndex) {
+                Write-Host " │ $($a.Cyan)▶ $($model)$($a.Reset)" -NoNewline
+                Write-Host " │"
+            } else {
+                Write-Host " │   $model │"
+            }
+        }
+
+        Write-Host " └────────────┘"
+        Write-Host ""
+        Write-Host "$($a.BrightBlack)↑↓ 选择 │ Enter 确认 │ Esc 取消$($a.Reset)"
+
+        $key = Read-Key
+
+        switch ($key) {
+            'ArrowUp' {
+                $selectedIndex = [Math]::Max(0, $selectedIndex - 1)
+            }
+            'ArrowDown' {
+                $selectedIndex = [Math]::Min($Models.Count - 1, $selectedIndex + 1)
+            }
+            'Enter' {
+                Show-Cursor
+                return $Models[$selectedIndex]
+            }
+            'Escape' {
+                Show-Cursor
+                return $null
+            }
+        }
+    }
+}
