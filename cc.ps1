@@ -274,12 +274,31 @@ function Sync-Profiles {
     try {
         # Clone 仓库
         $cloneResult = git clone --depth 1 --branch $config.branch $config.repoUrl $tempDir 2>&1
-        if ($LASTEXITCODE -ne 0) {
-            Write-Host ""
-            Write-Host "$($ANSI.BrightRed)✗$($ANSI.Reset) 克隆仓库失败" -ForegroundColor Red
-            Write-Host "  $cloneResult" -ForegroundColor Yellow
-            Write-Host ""
-            return
+        $cloneFailed = $LASTEXITCODE -ne 0
+        $isEmptyRepo = $cloneResult -match "Remote branch.*not found"
+
+        if ($cloneFailed) {
+            if ($isEmptyRepo) {
+                # 空仓库，初始化本地仓库
+                Write-Host "  检测到空仓库，正在初始化..." -ForegroundColor Yellow
+
+                Push-Location $tempDir
+                try {
+                    git init 2>&1 | Out-Null
+                    git remote add origin $config.repoUrl 2>&1 | Out-Null
+                    git checkout -b $config.branch 2>&1 | Out-Null
+                }
+                finally {
+                    Pop-Location
+                }
+            }
+            else {
+                Write-Host ""
+                Write-Host "$($ANSI.BrightRed)✗$($ANSI.Reset) 克隆仓库失败" -ForegroundColor Red
+                Write-Host "  $cloneResult" -ForegroundColor Yellow
+                Write-Host ""
+                return
+            }
         }
 
         # 确保 profiles 目录存在
@@ -306,7 +325,13 @@ function Sync-Profiles {
                 git commit -m "sync profiles at $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')"
 
                 # 推送
-                $pushResult = git push 2>&1
+                if ($isEmptyRepo) {
+                    # 空仓库首次推送，设置上游分支
+                    $pushResult = git push -u origin $config.branch 2>&1
+                }
+                else {
+                    $pushResult = git push 2>&1
+                }
                 if ($LASTEXITCODE -ne 0) {
                     Write-Host ""
                     Write-Host "$($ANSI.BrightRed)✗$($ANSI.Reset) 推送失败" -ForegroundColor Red
