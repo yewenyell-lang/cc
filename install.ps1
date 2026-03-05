@@ -2,10 +2,15 @@
 # install.ps1 - cc-helper 一键安装脚本
 
 param(
-    [string]$LocalSourcePath = ""
+    [string]$LocalSourcePath = "",
+    [switch]$Version,
+    [switch]$Help
 )
 
 $ErrorActionPreference = 'Stop'
+
+# 版本信息
+$SCRIPT_VERSION = "1.0.0"
 
 # 配置
 $REPO_OWNER = "yewenyell-lang"
@@ -16,6 +21,29 @@ $CC_CMD = "$BINDIR\cc.cmd"
 
 # 需要下载/复制的文件
 $FILES = @("cc.ps1", "tui.ps1", "ccswitch.ps1")
+
+# 显示版本信息
+if ($Version) {
+    Write-Host "cc-helper install script v$SCRIPT_VERSION"
+    exit 0
+}
+
+# 显示帮助信息
+if ($Help) {
+    Write-Host "cc-helper 一键安装脚本 v$SCRIPT_VERSION"
+    Write-Host ""
+    Write-Host "用法: install.ps1 [选项]"
+    Write-Host ""
+    Write-Host "选项:"
+    Write-Host "  -LocalSourcePath <路径>  从本地路径复制文件而不是从 GitHub 下载"
+    Write-Host "  -Version                 显示版本信息"
+    Write-Host "  -Help                    显示此帮助信息"
+    Write-Host ""
+    Write-Host "示例:"
+    Write-Host "  install.ps1                          # 从 GitHub 安装最新版本"
+    Write-Host "  install.ps1 -LocalSourcePath .\cc   # 从本地目录安装"
+    exit 0
+}
 
 # 检查 PowerShell 版本
 if ($PSVersionTable.PSVersion.Major -lt 7) {
@@ -74,19 +102,49 @@ else {
 
 # 生成 uninstall.ps1
 $uninstallScript = @"
+param(
+    [switch]`$Force,
+    [switch]`$Version,
+    [switch]`$Help
+)
+
+`$ErrorActionPreference = 'Stop'
+
+`$SCRIPT_VERSION = "1.0.0"
 `$INSTALL_DIR = "$INSTALL_DIR"
 `$BINDIR = "$BINDIR"
 `$CC_CMD = "$CC_CMD"
+
+# 显示版本信息
+if (`$Version) {
+    Write-Host "cc-helper uninstall script v`$SCRIPT_VERSION"
+    exit 0
+}
+
+# 显示帮助信息
+if (`$Help) {
+    Write-Host "cc-helper 卸载脚本 v`$SCRIPT_VERSION"
+    Write-Host ""
+    Write-Host "用法: uninstall.ps1 [选项]"
+    Write-Host ""
+    Write-Host "选项:"
+    Write-Host "  -Force     不询问确认，直接卸载"
+    Write-Host "  -Version   显示版本信息"
+    Write-Host "  -Help      显示此帮助信息"
+    exit 0
+}
 
 Write-Host "警告: 将删除以下内容:" -ForegroundColor Yellow
 Write-Host "  - `$INSTALL_DIR"
 Write-Host "  - `$CC_CMD"
 Write-Host ""
 
-`$confirm = Read-Host "输入 'yes' 确认卸载"
-if (`$confirm -ne 'yes') {
-    Write-Host "取消卸载" -ForegroundColor Cyan
-    exit 0
+if (-not `$Force) {
+    `$confirm = Read-Host "输入 'yes' 确认卸载"
+    if (`$confirm -ne 'yes') {
+        Write-Host "取消卸载" -ForegroundColor Cyan
+        exit 0
+    }
 }
 
 # 删除文件
