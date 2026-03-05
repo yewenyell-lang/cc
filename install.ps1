@@ -3,6 +3,7 @@
 
 param(
     [string]$LocalSourcePath = "",
+    [string]$Source = "",
     [switch]$Version,
     [switch]$Help
 )
@@ -22,6 +23,15 @@ $CC_CMD = "$BINDIR\cc.cmd"
 # 需要下载/复制的文件
 $FILES = @("cc.ps1", "tui.ps1", "ccswitch.ps1")
 
+# 下载源 URL
+$DOWNLOAD_SOURCES = @{
+    gitee = "https://gitee.com/yell-run/cc/raw/main"
+    github = "https://raw.githubusercontent.com/$REPO_OWNER/$REPO_NAME/main"
+}
+
+# 下载源优先级（用于自动切换）
+$SOURCE_PRIORITY = @("gitee", "github")
+
 # 显示版本信息
 if ($Version) {
     Write-Host "cc install script v$SCRIPT_VERSION"
@@ -35,12 +45,18 @@ if ($Help) {
     Write-Host "用法: install.ps1 [选项]"
     Write-Host ""
     Write-Host "选项:"
-    Write-Host "  -LocalSourcePath <路径>  从本地路径复制文件而不是从 GitHub 下载"
+    Write-Host "  -LocalSourcePath <路径>  从本地路径复制文件而不是下载"
+    Write-Host "  -Source <gitee|github>   指定下载源（默认自动选择：gitee -> github）"
     Write-Host "  -Version                 显示版本信息"
     Write-Host "  -Help                    显示此帮助信息"
     Write-Host ""
+    Write-Host "下载源说明:"
+    Write-Host "  gitee   - 从 Gitee 下载（国内网络推荐）"
+    Write-Host "  github  - 从 GitHub 下载（国外网络推荐）"
+    Write-Host ""
     Write-Host "示例:"
-    Write-Host "  install.ps1                          # 从 GitHub 安装最新版本"
+    Write-Host "  install.ps1                          # 自动选择源安装"
+    Write-Host "  install.ps1 -Source github           # 从 GitHub 安装"
     Write-Host "  install.ps1 -LocalSourcePath .\cc   # 从本地目录安装"
     exit 0
 }
@@ -83,20 +99,43 @@ if ($LocalSourcePath -and (Test-Path $LocalSourcePath)) {
     }
 }
 else {
-    # 下载文件
-    $BASE_URL = "https://raw.githubusercontent.com/$REPO_OWNER/$REPO_NAME/main"
-    foreach ($file in $FILES) {
-        $url = "$BASE_URL/$file"
-        $dest = "$INSTALL_DIR\$file"
-        Write-Host "下载: $url -> $dest"
+    # 确定下载源
+    if ($Source -and $DOWNLOAD_SOURCES.ContainsKey($Source)) {
+        # 用户指定了有效的源
+        $sourcesToTry = @($Source)
+    } else {
+        # 使用优先级列表（gitee 优先）
+        $sourcesToTry = $SOURCE_PRIORITY
+    }
+
+    $downloadSuccess = $false
+    foreach ($currentSource in $sourcesToTry) {
+        $BASE_URL = $DOWNLOAD_SOURCES[$currentSource]
+        Write-Host "尝试从 $currentSource 下载..." -ForegroundColor Cyan
+
         try {
-            Invoke-WebRequest -Uri $url -OutFile $dest -ErrorAction Stop
-            Write-Host "  完成" -ForegroundColor Green
+            foreach ($file in $FILES) {
+                $url = "$BASE_URL/$file"
+                $dest = "$INSTALL_DIR\$file"
+                Write-Host "下载: $url -> $dest"
+                Invoke-WebRequest -Uri $url -OutFile $dest -ErrorAction Stop
+                Write-Host "  完成" -ForegroundColor Green
+            }
+            $downloadSuccess = $true
+            Write-Host "从 $currentSource 下载成功!" -ForegroundColor Green
+            break
         }
         catch {
-            Write-Host "  失败: $_" -ForegroundColor Red
-            exit 1
+            Write-Host "  从 $currentSource 下载失败: $_" -ForegroundColor Yellow
+            if ($sourcesToTry.IndexOf($currentSource) -lt $sourcesToTry.Length - 1) {
+                Write-Host "切换到下一个源..." -ForegroundColor Cyan
+            }
         }
+    }
+
+    if (-not $downloadSuccess) {
+        Write-Host "错误: 所有下载源均失败" -ForegroundColor Red
+        exit 1
     }
 }
 
