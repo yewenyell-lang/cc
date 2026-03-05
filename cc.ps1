@@ -22,6 +22,21 @@ function Ensure-ConfigDir {
     }
 }
 
+# 检查同步环境
+function Test-SyncEnvironment {
+    # 检查 git 是否安装
+    $git = Get-Command git -ErrorAction SilentlyContinue
+    if (-not $git) {
+        Write-Host ""
+        Write-Host "$($ANSI.BrightRed)✗$($ANSI.Reset) 未安装 git" -ForegroundColor Red
+        Write-Host "  请先安装 git: https://git-scm.com/downloads" -ForegroundColor Yellow
+        Write-Host ""
+        return $false
+    }
+
+    return $true
+}
+
 # 获取所有配置
 function Get-Profiles {
     param([string]$CurrentAlias)
