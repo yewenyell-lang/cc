@@ -1,6 +1,10 @@
 #!/usr/bin/env pwsh
 # install.ps1 - cc-helper 一键安装脚本
 
+param(
+    [string]$LocalSourcePath = ""
+)
+
 $ErrorActionPreference = 'Stop'
 
 # 配置
@@ -10,7 +14,7 @@ $INSTALL_DIR = "$env:USERPROFILE\.cc"
 $BINDIR = "$env:USERPROFILE\.local\bin"
 $CC_CMD = "$BINDIR\cc.cmd"
 
-# 需要下载的文件
+# 需要下载/复制的文件
 $FILES = @("cc.ps1", "tui.ps1", "ccswitch.ps1")
 
 # 检查 PowerShell 版本
@@ -33,19 +37,38 @@ if (-not (Test-Path $BINDIR)) {
     Write-Host "创建目录: $BINDIR" -ForegroundColor Green
 }
 
-# 下载文件
-$BASE_URL = "https://raw.githubusercontent.com/$REPO_OWNER/$REPO_NAME/main"
-foreach ($file in $FILES) {
-    $url = "$BASE_URL/$file"
-    $dest = "$INSTALL_DIR\$file"
-    Write-Host "下载: $url -> $dest"
-    try {
-        Invoke-WebRequest -Uri $url -OutFile $dest -ErrorAction Stop
-        Write-Host "  完成" -ForegroundColor Green
+# 安装文件（从本地复制或下载）
+if ($LocalSourcePath -and (Test-Path $LocalSourcePath)) {
+    Write-Host "使用本地源: $LocalSourcePath" -ForegroundColor Cyan
+    foreach ($file in $FILES) {
+        $src = Join-Path $LocalSourcePath $file
+        $dest = "$INSTALL_DIR\$file"
+        Write-Host "复制: $src -> $dest"
+        try {
+            Copy-Item -Path $src -Destination $dest -Force
+            Write-Host "  完成" -ForegroundColor Green
+        }
+        catch {
+            Write-Host "  失败: $_" -ForegroundColor Red
+            exit 1
+        }
     }
-    catch {
-        Write-Host "  失败: $_" -ForegroundColor Red
-        exit 1
+}
+else {
+    # 下载文件
+    $BASE_URL = "https://raw.githubusercontent.com/$REPO_OWNER/$REPO_NAME/main"
+    foreach ($file in $FILES) {
+        $url = "$BASE_URL/$file"
+        $dest = "$INSTALL_DIR\$file"
+        Write-Host "下载: $url -> $dest"
+        try {
+            Invoke-WebRequest -Uri $url -OutFile $dest -ErrorAction Stop
+            Write-Host "  完成" -ForegroundColor Green
+        }
+        catch {
+            Write-Host "  失败: $_" -ForegroundColor Red
+            exit 1
+        }
     }
 }
 
