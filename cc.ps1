@@ -10,6 +10,7 @@
 $script:CC_DIR = "$env:USERPROFILE/.cc"
 $script:PROFILES_DIR = "$script:CC_DIR/profiles"
 $script:CURRENT_FILE = "$script:CC_DIR/current"
+$script:CONFIG_FILE = "$script:CC_DIR/config.json"
 
 # 导入 cc-switch 迁移模块
 . "$PSScriptRoot/ccswitch.ps1"
