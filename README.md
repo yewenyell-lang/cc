@@ -16,7 +16,7 @@ Claude Code 配置管理工具 - 轻松管理多个 Claude Code API 配置。
 
 ```powershell
 # 一行命令从 GitHub 安装最新版本
-pwsh -NoProfile -ExecutionPolicy Bypass -Command "Invoke-WebRequest -Uri 'https://raw.githubusercontent.com/yewenyell-lang/cc/main/install.ps1' -OutFile '$env:TEMP\install.ps1'; & pwsh -NoProfile -ExecutionPolicy Bypass -File '$env:TEMP\install.ps1'"
+irm https://raw.githubusercontent.com/yewenyell-lang/cc/main/install.ps1 | iex
 ```
 
 ### 本地安装
@@ -25,7 +25,7 @@ pwsh -NoProfile -ExecutionPolicy Bypass -Command "Invoke-WebRequest -Uri 'https:
 # 克隆仓库后从本地安装
 git clone https://github.com/yewenyell-lang/cc.git
 cd cc
-pwsh -NoProfile -ExecutionPolicy Bypass -File install.ps1 -LocalSourcePath .
+pwsh -NoProfile -ExecutionPolicy Bypass -File  -LocalSourcePath .
 ```
 
 ### 安装后配置
