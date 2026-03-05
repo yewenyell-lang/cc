@@ -584,8 +584,11 @@ function Edit-Profile {
     $result = Show-ConfigForm -ExistingConfig $existingHashtable -IsEdit -ExistingAliases $existingAliases
 
     if ($result) {
-        # 保存配置（使用原别名）
+        # 保存配置(使用原别名)
         $result.alias = $Alias
+
+        # 更新时间戳
+        $result | Add-Member -NotePropertyName "updatedAt" -NotePropertyValue (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ") -Force
         $result | ConvertTo-Json -Depth 10 | Set-Content $profilePath -Encoding UTF8
 
         Write-Host ""
