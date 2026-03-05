@@ -475,7 +475,7 @@ function Show-ConfigForm {
                 '*' * [Math]::Min($value.Length, 20)
             } elseif ($field.IsArray) {
                 $arr = if ($value) { $value } else { @() }
-                "($arr.Count 个模型)"
+                "$($arr.Count) 个模型)"
             } else {
                 $value
             }
