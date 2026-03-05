@@ -1,0 +1,113 @@
+#!/usr/bin/env pwsh
+# install.ps1 - cc-helper 一键安装脚本
+
+$ErrorActionPreference = 'Stop'
+
+# 配置
+$REPO_OWNER = "yewenyell-lang"
+$REPO_NAME = "cc"
+$INSTALL_DIR = "$env:USERPROFILE\.cc"
+$BINDIR = "$env:USERPROFILE\.local\bin"
+$CC_CMD = "$BINDIR\cc.cmd"
+
+# 需要下载的文件
+$FILES = @("cc.ps1", "tui.ps1", "ccswitch.ps1")
+
+# 检查 PowerShell 版本
+if ($PSVersionTable.PSVersion.Major -lt 7) {
+    Write-Host "错误: 需要 PowerShell 7.0 或更高版本" -ForegroundColor Red
+    Write-Host "当前版本: $($PSVersionTable.PSVersion)" -ForegroundColor Red
+    exit 1
+}
+
+Write-Host "开始安装 cc-helper..." -ForegroundColor Cyan
+
+# 创建目录
+if (-not (Test-Path $INSTALL_DIR)) {
+    New-Item -ItemType Directory -Path $INSTALL_DIR -Force | Out-Null
+    Write-Host "创建目录: $INSTALL_DIR" -ForegroundColor Green
+}
+
+if (-not (Test-Path $BINDIR)) {
+    New-Item -ItemType Directory -Path $BINDIR -Force | Out-Null
+    Write-Host "创建目录: $BINDIR" -ForegroundColor Green
+}
+
+# 下载文件
+$BASE_URL = "https://raw.githubusercontent.com/$REPO_OWNER/$REPO_NAME/main"
+foreach ($file in $FILES) {
+    $url = "$BASE_URL/$file"
+    $dest = "$INSTALL_DIR\$file"
+    Write-Host "下载: $url -> $dest"
+    try {
+        Invoke-WebRequest -Uri $url -OutFile $dest -ErrorAction Stop
+        Write-Host "  完成" -ForegroundColor Green
+    }
+    catch {
+        Write-Host "  失败: $_" -ForegroundColor Red
+        exit 1
+    }
+}
+
+# 生成 uninstall.ps1
+$uninstallScript = @"
+`$INSTALL_DIR = "$INSTALL_DIR"
+`$BINDIR = "$BINDIR"
+`$CC_CMD = "$CC_CMD"
+
+Write-Host "警告: 将删除以下内容:" -ForegroundColor Yellow
+Write-Host "  - `$INSTALL_DIR"
+Write-Host "  - `$CC_CMD"
+Write-Host ""
+
+`$confirm = Read-Host "输入 'yes' 确认卸载"
+if (`$confirm -ne 'yes') {
+    Write-Host "取消卸载" -ForegroundColor Cyan
+    exit 0
+}
+
+# 删除文件
+if (Test-Path `$INSTALL_DIR) {
+    Remove-Item -Path `$INSTALL_DIR -Recurse -Force
+    Write-Host "已删除: `$INSTALL_DIR" -ForegroundColor Green
+}
+
+if (Test-Path `$CC_CMD) {
+    Remove-Item -Path `$CC_CMD -Force
+    Write-Host "已删除: `$CC_CMD" -ForegroundColor Green
+}
+
+Write-Host ""
+Write-Host "卸载完成!" -ForegroundColor Green
+Write-Host "如需从 PATH 中移除，请手动删除: `$env:USERPROFILE\.local\bin" -ForegroundColor Yellow
+"@
+
+$uninstallPath = "$INSTALL_DIR\uninstall.ps1"
+Set-Content -Path $uninstallPath -Value $uninstallScript -Force
+Write-Host "创建卸载脚本: $uninstallPath" -ForegroundColor Green
+
+# 创建 cc.cmd
+$cmdContent = @"
+@echo off
+pwsh -NoProfile -ExecutionPolicy Bypass -File "%USERPROFILE%\.cc\cc.ps1" %*
+"@
+
+Set-Content -Path $CC_CMD -Value $cmdContent -Force
+Write-Host "创建命令入口: $CC_CMD" -ForegroundColor Green
+
+# 检查 PATH
+$path = $env:PATH -split ';'
+if ($path -notcontains $BINDIR) {
+    Write-Host ""
+    Write-Host "安装完成!" -ForegroundColor Green
+    Write-Host ""
+    Write-Host "请将以下路径添加到 PATH:" -ForegroundColor Yellow
+    Write-Host "  $BINDIR"
+    Write-Host ""
+    Write-Host "方法: 系统属性 -> 高级 -> 环境变量 -> 用户变量 -> Path -> 编辑"
+}
+else {
+    Write-Host ""
+    Write-Host "安装完成!" -ForegroundColor Green
+    Write-Host "运行 'cc --help' 开始使用"
+}
