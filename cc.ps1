@@ -414,6 +414,9 @@ function Get-Profiles {
             Write-Warning "配置文件损坏: $($file.Name)"
         }
     }
+
+    # 将当前配置排在最前面
+    $profiles = $profiles | Sort-Object { -($_.isCurrent -as [int]) }
     return $profiles
 }
 
@@ -495,7 +498,28 @@ function Show-List {
         $name = $p.name.PadRight(16)
         $model = $p.config.env.ANTHROPIC_MODEL
 
-        Write-Host "  $alias $name $model $currentMark"
+        # 检查是否有可选模型列表
+        $extraModels = ""
+        if ($p.config.env.PSObject.Properties.Name -contains 'ANTHROPIC_MODELS') {
+            $modelsJson = $p.config.env.ANTHROPIC_MODELS
+            if ($modelsJson) {
+                try {
+                    $models = $modelsJson | ConvertFrom-Json
+                    if ($models -is [String]) {
+                        $models = @($models)
+                    }
+                    if ($models.Count -gt 1) {
+                        # 获取除了当前模型以外的其他模型
+                        $otherModels = $models | Where-Object { $_ -ne $model }
+                        if ($otherModels.Count -gt 0) {
+                            $extraModels = " $($ANSI.DarkGray)[$($otherModels -join ", ")]$($ANSI.Reset)"
+                        }
+                    }
+                } catch {}
+            }
+        }
+
+        Write-Host "  $alias $name $model$extraModels $currentMark"
     }
 
     Write-Host ""
@@ -576,26 +600,7 @@ function Use-Profile {
     $config.env | Add-Member -NotePropertyName "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS" -NotePropertyValue "1" -Force
 
 
-    # 如果有多个模型，弹出选择器
-    $selectedModel = $config.env.ANTHROPIC_MODEL
-    if ($config.env.PSObject.Properties.Name -contains 'ANTHROPIC_MODELS') {
-        $modelsJson = $config.env.ANTHROPIC_MODELS
-        if ($modelsJson) {
-            $models = $modelsJson | ConvertFrom-Json
-            if ($models -is [String]) {
-                $models = @($models)
-            }
-            if ($models.Count -gt 0) {
-                $selectedModel = Show-ModelSelector -Models $models
-                if (-not $selectedModel) {
-                    $selectedModel = $config.env.ANTHROPIC_MODEL
-                }
-            }
-        }
-    }
-
-    # 使用选定的模型
-    $config.env.ANTHROPIC_MODEL = $selectedModel
+    # 直接使用配置中的默认模型，不再弹出选择器
 
     # 生成临时配置文件
     $tempPath = [System.IO.Path]::GetTempFileName() + ".json"
@@ -980,6 +985,7 @@ switch ($command) {
     'sync' { Sync-Profiles -Mode $param }
     default { Write-Host "未知命令: $command" -ForegroundColor Red; Show-Help }
 }
+
 
 
 
