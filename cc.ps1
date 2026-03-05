@@ -138,6 +138,50 @@ function Initialize-SyncConfig {
     }
 }
 
+# 删除记录文件路径
+$script:DELETED_FILE = "$script:CC_DIR/deleted.json"
+
+# 获取删除记录
+function Get-DeletedRecords {
+    if (-not (Test-Path $script:DELETED_FILE)) {
+        return @()
+    }
+
+    try {
+        $records = Get-Content $script:DELETED_FILE | ConvertFrom-Json
+        return $records
+    }
+    catch {
+        return @()
+    }
+}
+
+# 添加删除记录
+function Add-DeletedRecord {
+    param([string]$ProfileName)
+
+    $records = @(Get-DeletedRecords)
+    if ($records -notcontains $ProfileName) {
+        $records += $ProfileName
+        $records | ConvertTo-Json | Set-Content $script:DELETED_FILE -Encoding UTF8
+    }
+}
+
+# 从删除记录中移除
+function Remove-DeletedRecord {
+    param([string]$ProfileName)
+
+    $records = @(Get-DeletedRecords)
+    $records = $records | Where-Object { $_ -ne $ProfileName }
+
+    if ($records.Count -gt 0) {
+        $records | ConvertTo-Json | Set-Content $script:DELETED_FILE -Encoding UTF8
+    }
+    elseif (Test-Path $script:DELETED_FILE) {
+        Remove-Item $script:DELETED_FILE -Force
+    }
+}
+
 # 比较并合并 profiles
 function Merge-Profiles {
     param(
@@ -150,7 +194,11 @@ function Merge-Profiles {
         uploaded = @()
         downloaded = @()
         skipped = @()
+        deleted = @()
     }
+
+    # 加载删除记录
+    $deletedRecords = @(Get-DeletedRecords)
 
     # 获取本地和远程文件列表
     $localFiles = @{}
@@ -204,8 +252,15 @@ function Merge-Profiles {
         elseif ($Mode -eq "pull") {
             # 仅下载模式
             if ($remote -and -not $local) {
-                Copy-Item $remote.path "$LocalDir/$fileName"
-                $results.downloaded += $fileName
+                $profileName = $fileName -replace '\.json$', ''
+                if ($deletedRecords -contains $profileName) {
+                    # 已被本地删除，跳过下载
+                    $results.skipped += "$fileName (已删除)"
+                }
+                else {
+                    Copy-Item $remote.path "$LocalDir/$fileName"
+                    $results.downloaded += $fileName
+                }
             }
             elseif ($local -and $remote) {
                 if ($remote.updatedAt -gt $local.updatedAt) {
@@ -224,8 +279,17 @@ function Merge-Profiles {
                 $results.uploaded += $fileName
             }
             elseif (-not $local -and $remote) {
-                Copy-Item $remote.path "$LocalDir/$fileName"
-                $results.downloaded += $fileName
+                $profileName = $fileName -replace '\.json$', ''
+                if ($deletedRecords -contains $profileName) {
+                    # 已被本地删除，删除远程文件并移除记录
+                    Remove-Item $remote.path -Force
+                    Remove-DeletedRecord -ProfileName $profileName
+                    $results.deleted += $fileName
+                }
+                else {
+                    Copy-Item $remote.path "$LocalDir/$fileName"
+                    $results.downloaded += $fileName
+                }
             }
             elseif ($local -and $remote) {
                 if ($local.updatedAt -gt $remote.updatedAt) {
@@ -748,6 +812,9 @@ function Remove-Profile {
         if ($Alias -eq $currentAlias) {
             Remove-Item $script:CURRENT_FILE -Force -ErrorAction SilentlyContinue
         }
+
+        # 记录删除操作，防止 sync 恢复
+        Add-DeletedRecord -ProfileName $Alias
 
         Write-Host ""
         Write-Host "$($ANSI.Green)✓$($ANSI.Reset) 配置 '$Alias' 已删除" -ForegroundColor Green
