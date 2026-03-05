@@ -508,82 +508,20 @@ function Uninstall-CcHelper {
 
 # 更新 cc-helper
 function Update-CcHelper {
-    $INSTALL_DIR = "$env:USERPROFILE\.cc"
-    $BASE_URL = "https://raw.githubusercontent.com/yewenyell-lang/cc/main"
-    $FILES = @("cc.ps1", "tui.ps1", "ccswitch.ps1")
-
-    # 检查安装目录
-    if (-not (Test-Path $INSTALL_DIR)) {
-        Write-Host "$($ANSI.BrightRed)✗$($ANSI.Reset) 未安装 cc-helper，请先运行 install.ps1" -ForegroundColor Red
-        return
-    }
+    $UPDATE_URL = "https://raw.githubusercontent.com/yewenyell-lang/cc/main/update.ps1"
 
     Write-Host "正在更新 cc-helper..." -ForegroundColor Cyan
 
-    $backupFiles = @()
-    $tempFiles = @()
-
     try {
-        # 备份并下载文件
-        foreach ($file in $FILES) {
-            $srcPath = "$INSTALL_DIR"
-            $bakPath = "$srcPath.bak"
-            $tmpPath = "$env:TEMP"
-
-            # 备份原文件
-            if (Test-Path $srcPath) {
-                Copy-Item -Path $srcPath -Destination $bakPath -Force
-                $backupFiles += $bakPath
-            }
-
-            # 下载新文件
-            $url = "$BASE_URL/$file"
-            Write-Host "下载: $url"
-            try {
-                Invoke-WebRequest -Uri $url -OutFile $tmpPath -ErrorAction Stop
-                $tempFiles += $tmpPath
-            }
-            catch {
-                throw "下载失败: $file - $_"
-            }
-        }
-
-        # 替换文件
-        foreach ($file in $FILES) {
-            $srcPath = "$INSTALL_DIR"
-            $tmpPath = "$env:TEMP"
-            Move-Item -Path $tmpPath -Destination $srcPath -Force
-            Write-Host "  更新: $file" -ForegroundColor Green
-        }
-
-        # 清理备份
-        foreach ($bak in $backupFiles) {
-            Remove-Item -Path $bak -Force -ErrorAction SilentlyContinue
-        }
-
-        Write-Host ""
-        Write-Host "$($ANSI.BrightGreen)✓$($ANSI.Reset) 更新完成!" -ForegroundColor Green
+        Invoke-WebRequest -Uri $UPDATE_URL -OutFile "$env:TEMP\cc-update.ps1" -ErrorAction Stop
+        & "$env:TEMP\cc-update.ps1"
+        Remove-Item "$env:TEMP\cc-update.ps1" -Force -ErrorAction SilentlyContinue
     }
     catch {
-        # 恢复备份
-        foreach ($bak in $backupFiles) {
-            $originalPath = $bak -replace '\.bak$', ''
-            if (Test-Path $bak) {
-                Move-Item -Path $bak -Destination $originalPath -Force
-            }
-        }
-
         Write-Host ""
         Write-Host "$($ANSI.BrightRed)✗$($ANSI.Reset) 更新失败: $_" -ForegroundColor Red
-        Write-Host "请手动运行 install.ps1 进行更新" -ForegroundColor Yellow
-    }
-    finally {
-        # 清理临时文件
-        foreach ($tmp in $tempFiles) {
-            if (Test-Path $tmp) {
-                Remove-Item -Path $tmp -Force -ErrorAction SilentlyContinue
-            }
-        }
+        Write-Host "请手动运行以下命令进行更新:" -ForegroundColor Yellow
+        Write-Host "  irm https://raw.githubusercontent.com/yewenyell-lang/cc/main/update.ps1 | iex" -ForegroundColor Cyan
     }
 }
 

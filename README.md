@@ -47,6 +47,7 @@ pwsh -NoProfile -ExecutionPolicy Bypass -File  -LocalSourcePath .
 | `cc test [alias]` | 测试 API 连接（无参数显示选择器） |
 | `cc ccswitch` | 从 cc-switch 迁移配置 |
 | `cc uninstall` | 卸载 cc-helper |
+| `cc update` | 更新 cc-helper 到最新版本 |
 
 ## 使用示例
 
