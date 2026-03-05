@@ -575,6 +575,28 @@ function Use-Profile {
     # 注入固定字段
     $config.env | Add-Member -NotePropertyName "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS" -NotePropertyValue "1" -Force
 
+
+    # 如果有多个模型，弹出选择器
+    $selectedModel = $config.env.ANTHROPIC_MODEL
+    if ($config.env.PSObject.Properties.Name -contains 'ANTHROPIC_MODELS') {
+        $modelsJson = $config.env.ANTHROPIC_MODELS
+        if ($modelsJson) {
+            $models = $modelsJson | ConvertFrom-Json
+            if ($models -is [String]) {
+                $models = @($models)
+            }
+            if ($models.Count -gt 0) {
+                $selectedModel = Show-ModelSelector -Models $models
+                if (-not $selectedModel) {
+                    $selectedModel = $config.env.ANTHROPIC_MODEL
+                }
+            }
+        }
+    }
+
+    # 使用选定的模型
+    $config.env.ANTHROPIC_MODEL = $selectedModel
+
     # 生成临时配置文件
     $tempPath = [System.IO.Path]::GetTempFileName() + ".json"
     try {
@@ -957,6 +979,8 @@ switch ($command) {
     'sync' { Sync-Profiles -Mode $param }
     default { Write-Host "未知命令: $command" -ForegroundColor Red; Show-Help }
 }
+
+
 
 
 
