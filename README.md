@@ -9,6 +9,7 @@ Claude Code 配置管理工具 - 轻松管理多个 Claude Code API 配置。
 - ✅ **连接测试** - 测试 API 连接是否正常
 - 📦 **一键安装** - 从 GitHub 快速安装
 - 🗑️ **干净卸载** - 完整移除所有相关文件
+- ☁️ **配置同步** - 通过 Git 仓库同步配置到多台设备
 
 ## 安装
 
@@ -48,6 +49,7 @@ pwsh -NoProfile -ExecutionPolicy Bypass -File  -LocalSourcePath .
 | `cc ccswitch` | 从 cc-switch 迁移配置 |
 | `cc uninstall` | 卸载 cc-helper |
 | `cc update` | 更新 cc-helper 到最新版本 |
+| `cc sync [push\|pull]` | 同步配置到/从远程仓库 |
 
 ## 使用示例
 
@@ -88,6 +90,19 @@ cc uninstall
 
 # 强制卸载（不询问确认）
 cc uninstall -Force
+```
+
+### 同步配置
+
+```powershell
+# 首次设置同步（交互式配置）
+cc sync
+
+# 推送配置到远程仓库
+cc sync push
+
+# 从远程仓库拉取配置
+cc sync pull
 ```
 
 ## 配置目录
