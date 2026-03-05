@@ -85,7 +85,7 @@ function Initialize-SyncConfig {
     Write-Host ""
 
     # 输入仓库 URL
-    Write-Host "请输入 Git 仓库 URL (SSH 格式): " -NoNewline
+    Write-Host "请输入 Git 仓库 URL (支持 HTTPS 或 SSH 格式): " -NoNewline
     $repoUrl = Read-Host
 
     if (-not $repoUrl) {
@@ -93,6 +93,29 @@ function Initialize-SyncConfig {
         Write-Host "$($ANSI.BrightRed)✗$($ANSI.Reset) 仓库 URL 不能为空" -ForegroundColor Red
         Write-Host ""
         return $null
+    }
+
+    # 验证 URL 格式
+    $isHttps = $repoUrl -match '^https?://'
+    $isSsh = $repoUrl -match '^git@|\.git$'
+    if (-not $isHttps -and -not $isSsh) {
+        Write-Host ""
+        Write-Host "$($ANSI.Yellow)!$($ANSI.Reset) URL 格式可能不正确，继续吗？" -ForegroundColor Yellow
+        Write-Host "  HTTPS 格式: https://github.com/owner/repo.git"
+        Write-Host "  SSH 格式:   git@github.com:owner/repo.git"
+        Write-Host ""
+        Write-Host "继续 [Y/n]: " -NoNewline
+        $confirm = Read-Host
+        if ($confirm -eq 'n' -or $confirm -eq 'N') {
+            return $null
+        }
+    }
+
+    # HTTPS 提示
+    if ($isHttps) {
+        Write-Host ""
+        Write-Host "$($ANSI.Cyan)ℹ$($ANSI.Reset) 使用 HTTPS 格式，请确保已配置 Git credential helper" -ForegroundColor Cyan
+        Write-Host "  或在 URL 中包含 token: https://<token>@github.com/owner/repo.git" -ForegroundColor DarkGray
     }
 
     # 输入分支名称

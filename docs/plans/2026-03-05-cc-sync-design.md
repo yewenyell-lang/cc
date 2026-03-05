@@ -7,7 +7,7 @@
 ## 功能特性
 
 - 支持任意 Git 仓库（GitHub、GitLab、Gitea 等）
-- 使用 SSH 认证
+- 支持 HTTPS 和 SSH 两种认证方式
 - 双向同步，按时间戳处理冲突
 - 交互式初始化配置
 
@@ -40,8 +40,7 @@ cc sync [push|pull]    同步配置到/从远程仓库
 cc sync
   │
   ├── 1. 检查环境
-  │     ├── git 是否安装
-  │     └── SSH 认证是否可用 (ssh -T)
+  │     └── git 是否安装
   │
   ├── 2. 读取/初始化同步配置
   │     └── 无配置时提示输入仓库 URL
@@ -110,7 +109,7 @@ function Merge-Profiles {
 | 场景 | 处理方式 |
 |------|----------|
 | git 未安装 | 提示安装 git |
-| SSH key 未配置 | 提示配置 SSH key 并提供帮助链接 |
+| 认证失败 | 提示检查 SSH key 或 HTTPS credential 配置 |
 | 仓库不存在 | 提示检查 URL 是否正确 |
 | 网络错误 | 显示错误信息，建议检查网络后重试 |
 | push 失败 | 提示可能是权限问题 |
@@ -123,7 +122,7 @@ function Merge-Profiles {
 cc sync
 正在初始化同步配置...
 
-请输入 Git 仓库 URL (SSH 格式): git@github.com:owner/repo.git
+请输入 Git 仓库 URL (支持 HTTPS 或 SSH 格式): git@github.com:owner/repo.git
 分支名称 [main]:
 ✓ 配置已保存
 正在同步...
