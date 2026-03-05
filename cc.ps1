@@ -465,6 +465,8 @@ function New-Profile {
     if ($result) {
         # 保存配置文件
         $profilePath = "$script:PROFILES_DIR/$($result.alias).json"
+        # 添加时间戳
+        $result | Add-Member -NotePropertyName "updatedAt" -NotePropertyValue (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ") -Force
         $result | ConvertTo-Json -Depth 10 | Set-Content $profilePath -Encoding UTF8
 
         Write-Host ""
