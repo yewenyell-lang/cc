@@ -460,6 +460,9 @@ function Show-ConfigForm {
             # 显示值（令牌可隐藏）
             $displayValue = if ($field.Masked -and -not $tokenVisible -and $value) {
                 '*' * [Math]::Min($value.Length, 20)
+            } elseif ($field.IsArray) {
+                $arr = if ($value) { $value } else { @() }
+                "($arr.Count 个模型)"
             } else {
                 $value
             }
