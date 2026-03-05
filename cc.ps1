@@ -223,6 +223,130 @@ function Merge-Profiles {
     return $results
 }
 
+# 同步 profiles 到/从远程仓库
+function Sync-Profiles {
+    param([string]$Mode = "sync")
+
+    # 检查环境
+    if (-not (Test-SyncEnvironment)) {
+        return
+    }
+
+    # 获取或初始化配置
+    $config = Get-SyncConfig
+    if (-not $config) {
+        $config = Initialize-SyncConfig
+        if (-not $config) {
+            return
+        }
+    }
+
+    Write-Host ""
+    Write-Host "$($ANSI.Green)✓$($ANSI.Reset) 仓库: $($config.repoUrl)" -ForegroundColor Green
+    Write-Host "正在同步..." -ForegroundColor Cyan
+
+    # 创建临时目录
+    $tempDir = New-TemporaryDirectory
+
+    try {
+        # Clone 仓库
+        $cloneResult = git clone --depth 1 --branch $config.branch $config.repoUrl $tempDir 2>&1
+        if ($LASTEXITCODE -ne 0) {
+            Write-Host ""
+            Write-Host "$($ANSI.BrightRed)✗$($ANSI.Reset) 克隆仓库失败" -ForegroundColor Red
+            Write-Host "  $cloneResult" -ForegroundColor Yellow
+            Write-Host ""
+            return
+        }
+
+        # 确保 profiles 目录存在
+        $remoteProfilesDir = "$tempDir/profiles"
+        if (-not (Test-Path $remoteProfilesDir)) {
+            New-Item -ItemType Directory -Path $remoteProfilesDir -Force | Out-Null
+        }
+
+        # 执行合并
+        $results = Merge-Profiles -LocalDir $script:PROFILES_DIR -RemoteDir $remoteProfilesDir -Mode $Mode
+
+        # 检查是否有变更
+        Push-Location $tempDir
+        try {
+            $hasChanges = (git status --porcelain).Length -gt 0
+
+            if ($hasChanges) {
+                # 配置 git 用户信息
+                git config user.email "cc-helper@local" 2>$null
+                git config user.name "cc-helper" 2>$null
+
+                # 提交变更
+                git add .
+                git commit -m "sync profiles at $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')"
+
+                # 推送
+                $pushResult = git push 2>&1
+                if ($LASTEXITCODE -ne 0) {
+                    Write-Host ""
+                    Write-Host "$($ANSI.BrightRed)✗$($ANSI.Reset) 推送失败" -ForegroundColor Red
+                    Write-Host "  $pushResult" -ForegroundColor Yellow
+                    Write-Host ""
+                    return
+                }
+            }
+        }
+        finally {
+            Pop-Location
+        }
+
+        # 显示结果
+        Write-Host ""
+        if ($results.uploaded.Count -gt 0) {
+            foreach ($f in $results.uploaded) {
+                Write-Host "  $($ANSI.Green)↑$($ANSI.Reset) 上传: $f"
+            }
+        }
+        if ($results.downloaded.Count -gt 0) {
+            foreach ($f in $results.downloaded) {
+                Write-Host "  $($ANSI.Cyan)↓$($ANSI.Reset) 下载: $f"
+            }
+        }
+        if ($results.skipped.Count -gt 0) {
+            foreach ($f in $results.skipped) {
+                Write-Host "  $($ANSI.DarkGray)=$($ANSI.Reset) 跳过: $f (无变化)"
+            }
+        }
+
+        # 更新最后同步时间
+        Update-SyncLastTime
+
+        Write-Host ""
+        Write-Host "$($ANSI.Green)✓$($ANSI.Reset) 同步完成" -ForegroundColor Green
+        Write-Host ""
+    }
+    finally {
+        # 清理临时目录
+        if (Test-Path $tempDir) {
+            Remove-Item $tempDir -Recurse -Force -ErrorAction SilentlyContinue
+        }
+    }
+}
+
+# 创建临时目录的辅助函数
+function New-TemporaryDirectory {
+    $tempPath = [System.IO.Path]::GetTempPath()
+    $tempDir = Join-Path $tempPath "cc-sync-$(Get-Random)"
+    New-Item -ItemType Directory -Path $tempDir -Force | Out-Null
+    return $tempDir
+}
+
+# 更新最后同步时间
+function Update-SyncLastTime {
+    if (Test-Path $script:CONFIG_FILE) {
+        $config = Get-Content $script:CONFIG_FILE | ConvertFrom-Json
+        $config.sync.lastSync = (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ")
+        $config | ConvertTo-Json -Depth 10 | Set-Content $script:CONFIG_FILE -Encoding UTF8
+    }
+}
+
 # 获取所有配置
 function Get-Profiles {
     param([string]$CurrentAlias)
