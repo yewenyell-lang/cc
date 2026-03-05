@@ -418,6 +418,7 @@ function Show-Help {
     Write-Host "  cc ccswitch     从 cc-switch 迁移配置"
     Write-Host "  cc uninstall    卸载 cc-helper"
     Write-Host "  cc update       更新 cc-helper 到最新版本"
+    Write-Host "  cc sync [push|pull] 同步配置到/从远程仓库"
     Write-Host ""
 }
 
@@ -868,5 +869,6 @@ switch ($command) {
     'ccswitch' { Import-FromCcSwitch }
     'uninstall' { Uninstall-CcHelper -Args $args[1..($args.Length-1)] }
     'update' { Update-CcHelper }
+    'sync' { Sync-Profiles -Mode $param }
     default { Write-Host "未知命令: $command" -ForegroundColor Red; Show-Help }
 }
