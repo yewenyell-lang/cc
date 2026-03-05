@@ -527,6 +527,11 @@ function Show-ConfigForm {
                 if ($currentField.Masked) {
                     $tokenVisible = -not $tokenVisible
                 }
+                # 如果是 models 字段，调出模型输入表单
+                if ($currentField.Key -eq 'models') {
+                    $models = Show-ModelInputForm -ExistingModels $values['models']
+                    $values['models'] = $models
+                }
             }
             ([ConsoleKey]::Spacebar) {
                 if ($currentField.Masked) {
