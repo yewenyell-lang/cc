@@ -1,4 +1,4 @@
-# cc-helper
+# cc
 
 Claude Code 配置管理工具 - 轻松管理多个 Claude Code API 配置。
 
@@ -47,8 +47,8 @@ pwsh -NoProfile -ExecutionPolicy Bypass -File  -LocalSourcePath .
 | `cc rm [alias]` | 删除配置（无参数显示选择器） |
 | `cc test [alias]` | 测试 API 连接（无参数显示选择器） |
 | `cc ccswitch` | 从 cc-switch 迁移配置 |
-| `cc uninstall` | 卸载 cc-helper |
-| `cc update` | 更新 cc-helper 到最新版本 |
+| `cc uninstall` | 卸载 cc |
+| `cc update` | 更新 cc 到最新版本 |
 | `cc sync [push\|pull]` | 同步配置到/从远程仓库 |
 
 ## 使用示例

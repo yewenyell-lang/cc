@@ -317,8 +317,8 @@ function Sync-Profiles {
 
             if ($hasChanges) {
                 # 配置 git 用户信息
-                git config user.email "cc-helper@local" 2>$null
-                git config user.name "cc-helper" 2>$null
+                git config user.email "cc@local" 2>$null
+                git config user.name "cc" 2>$null
 
                 # 提交变更
                 git add .
@@ -464,8 +464,8 @@ function Show-Help {
     Write-Host "  cc rm [alias]   删除配置 (无参数显示选择器)"
     Write-Host "  cc test [alias] 测试 API 连接 (无参数显示选择器)"
     Write-Host "  cc ccswitch     从 cc-switch 迁移配置"
-    Write-Host "  cc uninstall    卸载 cc-helper"
-    Write-Host "  cc update       更新 cc-helper 到最新版本"
+    Write-Host "  cc uninstall    卸载 cc"
+    Write-Host "  cc update       更新 cc 到最新版本"
     Write-Host "  cc sync [push|pull] 同步配置到/从远程仓库"
     Write-Host ""
 }
@@ -865,8 +865,8 @@ function Test-Profile {
     Write-Host ""
 }
 
-# 卸载 cc-helper
-function Uninstall-CcHelper {
+# 卸载 cc
+function Uninstall-Cc {
     param([string[]]$Args)
 
     $uninstallScript = "$PSScriptRoot/uninstall.ps1"
@@ -886,11 +886,11 @@ function Uninstall-CcHelper {
     & pwsh -NoProfile -ExecutionPolicy Bypass -File $uninstallScript @Args
 }
 
-# 更新 cc-helper
-function Update-CcHelper {
+# 更新 cc
+function Update-Cc {
     $UPDATE_URL = "https://raw.githubusercontent.com/yewenyell-lang/cc/main/update.ps1"
 
-    Write-Host "正在更新 cc-helper..." -ForegroundColor Cyan
+    Write-Host "正在更新 cc..." -ForegroundColor Cyan
 
     try {
         Invoke-WebRequest -Uri $UPDATE_URL -OutFile "$env:TEMP\cc-update.ps1" -ErrorAction Stop
@@ -920,8 +920,8 @@ switch ($command) {
     'rm' { Remove-Profile -Alias $param }
     'test' { Test-Profile -Alias $param }
     'ccswitch' { Import-FromCcSwitch }
-    'uninstall' { Uninstall-CcHelper -Args $args[1..($args.Length-1)] }
-    'update' { Update-CcHelper }
+    'uninstall' { Uninstall-Cc -Args $args[1..($args.Length-1)] }
+    'update' { Update-Cc }
     'sync' { Sync-Profiles -Mode $param }
     default { Write-Host "未知命令: $command" -ForegroundColor Red; Show-Help }
 }

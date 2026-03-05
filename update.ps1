@@ -1,5 +1,5 @@
 #!/usr/bin/env pwsh
-# update.ps1 - cc-helper 更新脚本
+# update.ps1 - cc 更新脚本
 
 param(
     [string]$LocalSourcePath = "",
@@ -22,13 +22,13 @@ $FILES = @("cc.ps1", "tui.ps1", "ccswitch.ps1")
 
 # 显示版本信息
 if ($Version) {
-    Write-Host "cc-helper update script v$SCRIPT_VERSION"
+    Write-Host "cc update script v$SCRIPT_VERSION"
     exit 0
 }
 
 # 显示帮助信息
 if ($Help) {
-    Write-Host "cc-helper 更新脚本 v$SCRIPT_VERSION"
+    Write-Host "cc 更新脚本 v$SCRIPT_VERSION"
     Write-Host ""
     Write-Host "用法: update.ps1 [选项]"
     Write-Host ""
@@ -45,15 +45,15 @@ if ($Help) {
 
 # 检查是否已安装
 if (-not (Test-Path $INSTALL_DIR)) {
-    Write-Host "错误: 未检测到 cc-helper 安装" -ForegroundColor Red
+    Write-Host "错误: 未检测到 cc 安装" -ForegroundColor Red
     Write-Host "请先运行 install.ps1 进行安装" -ForegroundColor Yellow
     exit 1
 }
 
-Write-Host "开始更新 cc-helper..." -ForegroundColor Cyan
+Write-Host "开始更新 cc..." -ForegroundColor Cyan
 
 # 创建临时目录用于下载
-$tempDir = Join-Path $env:TEMP "cc-helper-update-$(Get-Random)"
+$tempDir = Join-Path $env:TEMP "cc-update-$(Get-Random)"
 New-Item -ItemType Directory -Path $tempDir -Force | Out-Null
 
 $backupFiles = @()
