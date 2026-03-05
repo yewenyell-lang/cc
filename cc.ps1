@@ -268,6 +268,13 @@ function Merge-Profiles {
                     $results.downloaded += $fileName
                 }
             }
+            elseif ($local -and -not $remote) {
+                # 本地存在但远程不存在，说明远程已删除
+                $profileName = $fileName -replace '\.json$', ''
+                Remove-Item $local.path -Force
+                Remove-DeletedRecord -ProfileName $profileName
+                $results.deleted += "$fileName (远程已删除)"
+            }
             elseif ($local -and $remote) {
                 if ($remote.updatedAt -gt $local.updatedAt) {
                     Copy-Item $remote.path "$LocalDir/$fileName"
@@ -430,6 +437,11 @@ function Sync-Profiles {
         if ($results.skipped.Count -gt 0) {
             foreach ($f in $results.skipped) {
                 Write-Host "  $($ANSI.DarkGray)=$($ANSI.Reset) 跳过: $f (无变化)"
+            }
+        }
+        if ($results.deleted.Count -gt 0) {
+            foreach ($f in $results.deleted) {
+                Write-Host "  $($ANSI.Red)✗$($ANSI.Reset) 删除: $f" -ForegroundColor Red
             }
         }
 
@@ -792,6 +804,80 @@ function Edit-Profile {
     }
 }
 
+# 从远程仓库删除配置
+function Remove-RemoteProfile {
+    param([string]$ProfileName)
+
+    # 检查环境
+    if (-not (Test-SyncEnvironment)) {
+        return "error"
+    }
+
+    # 获取同步配置
+    $config = Get-SyncConfig
+    if (-not $config) {
+        return "not_configured"
+    }
+
+    # 创建临时目录
+    $tempDir = New-TemporaryDirectory
+
+    try {
+        # Clone 仓库
+        $cloneResult = git clone --depth 1 --branch $config.branch $config.repoUrl $tempDir 2>&1
+        $cloneFailed = $LASTEXITCODE -ne 0
+        $isEmptyRepo = $cloneResult -match "Remote branch.*not found"
+
+        if ($cloneFailed -and -not $isEmptyRepo) {
+            Write-Host "  $($ANSI.BrightRed)✗$($ANSI.Reset) 克隆仓库失败" -ForegroundColor Red
+            return "error"
+        }
+
+        # 检查远程是否存在该配置文件
+        $remoteProfilePath = "$tempDir/profiles/$ProfileName.json"
+        if (-not (Test-Path $remoteProfilePath)) {
+            return "not_found"
+        }
+
+        # 删除文件
+        Remove-Item $remoteProfilePath -Force
+
+        # 提交并推送
+        Push-Location $tempDir
+        try {
+            git config user.email "cc@local" 2>$null
+            git config user.name "cc" 2>$null
+            git add . 2>$null
+            git commit -m "delete profile: $ProfileName" 2>$null
+
+            if ($isEmptyRepo) {
+                $pushResult = git push -u origin $config.branch 2>&1
+            } else {
+                $pushResult = git push 2>&1
+            }
+
+            if ($LASTEXITCODE -ne 0) {
+                Write-Host "  $($ANSI.BrightRed)✗$($ANSI.Reset) 推送失败: $pushResult" -ForegroundColor Red
+                return "error"
+            }
+
+            return "success"
+        }
+        finally {
+            Pop-Location
+        }
+    }
+    catch {
+        Write-Host "  $($ANSI.BrightRed)✗$($ANSI.Reset) 远程删除失败: $_" -ForegroundColor Red
+        return "error"
+    }
+    finally {
+        if (Test-Path $tempDir) {
+            Remove-Item $tempDir -Recurse -Force -ErrorAction SilentlyContinue
+        }
+    }
+}
+
 # 删除配置
 function Remove-Profile {
     param([string]$Alias)
@@ -829,6 +915,34 @@ function Remove-Profile {
     $confirm = Read-Host
 
     if ($confirm -eq 'y' -or $confirm -eq 'Y') {
+        # 先尝试从远程删除
+        $remoteResult = Remove-RemoteProfile -ProfileName $Alias
+
+        switch ($remoteResult) {
+            "success" {
+                Write-Host "  $($ANSI.Green)✓$($ANSI.Reset) 已从远程删除" -ForegroundColor Green
+            }
+            "not_configured" {
+                Write-Host "  $($ANSI.Yellow)!$($ANSI.Reset) 未配置同步，仅删除本地" -ForegroundColor Yellow
+            }
+            "not_found" {
+                Write-Host "  $($ANSI.Yellow)!$($ANSI.Reset) 远程不存在该配置" -ForegroundColor Yellow
+            }
+            "error" {
+                Write-Host ""
+                Write-Host "  $($ANSI.BrightRed)✗$($ANSI.Reset) 远程删除失败" -ForegroundColor Red
+                Write-Host "  继续删除本地? (y/N): " -NoNewline -ForegroundColor Yellow
+                $continueLocal = Read-Host
+                if ($continueLocal -ne 'y' -and $continueLocal -ne 'Y') {
+                    Write-Host ""
+                    Write-Host "  已取消" -ForegroundColor DarkGray
+                    Write-Host ""
+                    return
+                }
+            }
+        }
+
+        # 删除本地配置
         Remove-Item $profilePath -Force
 
         # 如果删除的是当前配置，清除 current 文件
