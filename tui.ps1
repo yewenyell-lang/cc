@@ -424,9 +424,22 @@ function Show-ConfigForm {
                 'opusModel' { $values[$key] = $ExistingConfig.env.ANTHROPIC_DEFAULT_OPUS_MODEL }
                 'haikuModel' { $values[$key] = $ExistingConfig.env.ANTHROPIC_DEFAULT_HAIKU_MODEL }
                 'reasoningModel' { $values[$key] = $ExistingConfig.env.ANTHROPIC_REASONING_MODEL }
+                'models' {
+                    $models = @()
+                    if ($ExistingConfig.env.PSObject.Properties.Name -contains 'ANTHROPIC_MODELS') {
+                        $modelsJson = $ExistingConfig.env.ANTHROPIC_MODELS
+                        if ($modelsJson) {
+                            $models = $modelsJson | ConvertFrom-Json
+                            if ($models -is [String]) {
+                                $models = @($models)
+                            }
+                        }
+                    }
+                    $values[$key] = $models
+                }
             }
         } else {
-            $values[$key] = ''
+            $values[$key] = if ($field.IsArray) { @() } else { '' }
         }
     }
 
@@ -564,6 +577,19 @@ function Show-ConfigForm {
                             ANTHROPIC_DEFAULT_OPUS_MODEL = if ($values['opusModel']) { $values['opusModel'] } else { $model }
                             ANTHROPIC_DEFAULT_HAIKU_MODEL = if ($values['haikuModel']) { $values['haikuModel'] } else { $model }
                             ANTHROPIC_REASONING_MODEL = if ($values['reasoningModel']) { $values['reasoningModel'] } else { $model }
+                'models' {
+                    $models = @()
+                    if ($ExistingConfig.env.PSObject.Properties.Name -contains 'ANTHROPIC_MODELS') {
+                        $modelsJson = $ExistingConfig.env.ANTHROPIC_MODELS
+                        if ($modelsJson) {
+                            $models = $modelsJson | ConvertFrom-Json
+                            if ($models -is [String]) {
+                                $models = @($models)
+                            }
+                        }
+                    }
+                    $values[$key] = $models
+                }
                         }
                         skipDangerousModePermissionPrompt = $true
                     }
