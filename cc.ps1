@@ -147,6 +147,9 @@ function Initialize-SyncConfig {
 # 删除记录文件路径
 $script:DELETED_FILE = "$script:CC_DIR/deleted.json"
 
+# 上次同步 commit 记录文件路径
+$script:LAST_SYNC_COMMIT_FILE = "$script:CC_DIR/last_sync_commit"
+
 # 获取删除记录
 function Get-DeletedRecords {
     if (-not (Test-Path $script:DELETED_FILE)) {
@@ -193,7 +196,8 @@ function Merge-Profiles {
     param(
         [string]$LocalDir,
         [string]$RemoteDir,
-        [string]$Mode = "sync"  # sync, push, pull
+        [string]$Mode = "sync",  # sync, push, pull
+        [string[]]$DeletedFromGit = @()  # git diff 检测到的删除文件
     )
 
     $results = @{
@@ -268,13 +272,7 @@ function Merge-Profiles {
                     $results.downloaded += $fileName
                 }
             }
-            elseif ($local -and -not $remote) {
-                # 本地存在但远程不存在，说明远程已删除
-                $profileName = $fileName -replace '\.json$', ''
-                Remove-Item $local.path -Force
-                Remove-DeletedRecord -ProfileName $profileName
-                $results.deleted += "$fileName (远程已删除)"
-            }
+            # 删除检测由 git diff 处理，不再通过文件存在性判断
             elseif ($local -and $remote) {
                 if ($remote.updatedAt -gt $local.updatedAt) {
                     Copy-Item $remote.path "$LocalDir/$fileName"
@@ -316,6 +314,21 @@ function Merge-Profiles {
                 else {
                     $results.skipped += $fileName
                 }
+            }
+        }
+    }
+
+    # pull 模式：处理 git diff 检测到的删除
+    if ($Mode -eq "pull" -and $DeletedFromGit.Count -gt 0) {
+        foreach ($deletedPath in $DeletedFromGit) {
+            $fileName = Split-Path $deletedPath -Leaf
+            $localPath = "$LocalDir/$fileName"
+
+            if (Test-Path $localPath) {
+                $profileName = $fileName -replace '\.json$', ''
+                Remove-Item $localPath -Force
+                Remove-DeletedRecord -ProfileName $profileName
+                $results.deleted += "$fileName (远程已删除)"
             }
         }
     }
@@ -384,8 +397,40 @@ function Sync-Profiles {
             New-Item -ItemType Directory -Path $remoteProfilesDir -Force | Out-Null
         }
 
+        # pull 模式：通过 git diff 检测删除的文件
+        $deletedFromGit = @()
+        $currentCommit = $null
+        if ($Mode -eq "pull" -and -not $isEmptyRepo) {
+            # 读取上次同步的 commit
+            $lastSyncCommit = $null
+            if (Test-Path $script:LAST_SYNC_COMMIT_FILE) {
+                $lastSyncCommit = (Get-Content $script:LAST_SYNC_COMMIT_FILE -Raw).Trim()
+            }
+
+            # 获取当前 commit hash
+            Push-Location $tempDir
+            try {
+                $currentCommit = git rev-parse HEAD 2>$null
+
+                if ($lastSyncCommit -and $currentCommit) {
+                    # 尝试获取更多历史（浅克隆需要）
+                    git fetch --unshallow 2>$null
+                    git fetch --depth=1000 2>$null
+
+                    # 检测 profiles/ 目录下被删除的文件
+                    $diffOutput = git diff --name-status --diff-filter=D "$lastSyncCommit" "$currentCommit" -- "profiles/*.json" 2>$null
+                    if ($diffOutput) {
+                        $deletedFromGit = $diffOutput | Where-Object { $_ -match '^D\s+' } | ForEach-Object { ($_ -split '\s+')[-1] }
+                    }
+                }
+            }
+            finally {
+                Pop-Location
+            }
+        }
+
         # 执行合并
-        $results = Merge-Profiles -LocalDir $script:PROFILES_DIR -RemoteDir $remoteProfilesDir -Mode $Mode
+        $results = Merge-Profiles -LocalDir $script:PROFILES_DIR -RemoteDir $remoteProfilesDir -Mode $Mode -DeletedFromGit $deletedFromGit
 
         # 检查是否有变更
         Push-Location $tempDir
@@ -416,10 +461,25 @@ function Sync-Profiles {
                     Write-Host ""
                     return
                 }
+
             }
         }
         finally {
             Pop-Location
+        }
+
+        # push/sync 模式完成后保存当前 commit
+        if ($Mode -in @("push", "sync") -and -not $isEmptyRepo) {
+            Push-Location $tempDir
+            try {
+                $commitToSave = git rev-parse HEAD 2>$null
+                if ($commitToSave) {
+                    $commitToSave | Out-File $script:LAST_SYNC_COMMIT_FILE -Force -Encoding UTF8
+                }
+            }
+            finally {
+                Pop-Location
+            }
         }
 
         # 显示结果
@@ -447,6 +507,11 @@ function Sync-Profiles {
 
         # 更新最后同步时间
         Update-SyncLastTime
+
+        # pull 模式完成后保存当前 commit（如果没有变更则使用之前获取的 commit）
+        if ($Mode -eq "pull" -and $currentCommit) {
+            $currentCommit | Out-File $script:LAST_SYNC_COMMIT_FILE -Force -Encoding UTF8
+        }
 
         Write-Host ""
         Write-Host "$($ANSI.Green)✓$($ANSI.Reset) 同步完成" -ForegroundColor Green
